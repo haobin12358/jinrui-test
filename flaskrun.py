@@ -1,5 +1,5 @@
-from FanstiBgs import create_app
-from FanstiBgs.extensions.register_ext import celery
+from jinrui import create_app
+from jinrui.extensions.register_ext import celery
 
 app = create_app()
 

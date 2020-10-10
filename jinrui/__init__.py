@@ -5,18 +5,20 @@ from flask_cors import CORS
 
 
 from .api.AHello import AHello
+from .api.AOcr import AOcr
 
 from .extensions.request_handler import error_handler, request_first_handler
 from .config.secret import DefaltSettig
 from .extensions.register_ext import register_ext
-from FanstiBgs.extensions.base_jsonencoder import JSONEncoder
-from FanstiBgs.extensions.base_request import Request
+from jinrui.extensions.base_jsonencoder import JSONEncoder
+from jinrui.extensions.base_request import Request
 
 
 def register(app):
-    bp = Blueprint(__name__, 'bp', url_prefix='/api')
-    bp.add_url_rule('/hello/<string:hello>', view_func=AHello.as_view('hello'))
-    app.register_blueprint(bp)
+    jr = Blueprint(__name__, 'jr', url_prefix='/api')
+    jr.add_url_rule('/hello/<string:hello>', view_func=AHello.as_view('hello'))
+    jr.add_url_rule('/ocr/<string:ocr>', view_func=AOcr.as_view('ocr'))
+    app.register_blueprint(jr)
 
 
 def after_request(resp):

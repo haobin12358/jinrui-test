@@ -3,304 +3,156 @@ import fitz
 
 pdf_dir = []
 
-path = "C:\\Users\\Administrator\\Desktop\\jinrui\\math"
+path = "C:\\Users\\Administrator\\Desktop\\jinrui\\testsheet"
 sheet_json = [
-  {
-    "type":"select",
-    "name":"选择题",
-    "num":10,
-    "score":"3",
-    "start":1,
-    "dot":[83.259,355.949],
-    "height":83.56940509915015,
-    "width":521.81,
-    "every_height":15.11,
-    "every_width":119.8,
-    "padding":5.67,
-    "total_score":30,
-    "index":0,
-    "page":1
-  },
-  {
-    "type":"fill",
-    "name":"填空题",
-    "num":1,
-    "score":"4;2;0",
-    "start":11,
-    "dot":[33.99,355.51940509915016],
-    "height":38.243626062322946,
-    "width":521.81,
-    "every_height":22.6628895184136,
-    "every_width":521.81,
-    "padding":0,
-    "every_score":[4,2,0],
-    "total_score":4,
-    "index":1,
-    "score_height":4,
-    "score_width":27,
-    "score_dot":[611.8927478753541,352.6865439093485],
-    "page":1
-  },
-  {
-    "type":"fill",
-    "name":"填空题",
-    "num":1,
-    "score":"4;0",
-    "start":12,
-    "dot":[33.99,393.7630311614731],
-    "height":38.243626062322946,
-    "width":521.81,
-    "every_height":22.6628895184136,
-    "every_width":521.81,
-    "padding":0,
-    "every_score":[4,0],
-    "total_score":4,
-    "index":2,
-    "score_height":4,
-    "score_width":18,
-    "score_dot":[637.3884985835693,390.93016997167143],
-    "page":1
-  },
-  {
-    "type":"fill",
-    "name":"填空题",
-    "num":1,
-    "score":"4;0",
-    "start":13,
-    "dot":[33.99,432.0066572237961],
-    "height":38.243626062322946,
-    "width":521.81,
-    "every_height":22.6628895184136,
-    "every_width":521.81,
-    "padding":0,
-    "every_score":[4,0],
-    "total_score":4,
-    "index":3,
-    "score_height":4,
-    "score_width":18,
-    "score_dot":[637.3884985835693,429.1737960339944],
-    "page":1
-  },
-  {
-    "type":"fill",
-    "name":"填空题",
-    "num":1,
-    "score":"4;0",
-    "start":14,
-    "dot":[33.99,470.25028328611904],
-    "height":38.243626062322946,
-    "width":521.81,
-    "every_height":22.6628895184136,
-    "every_width":521.81,
-    "padding":0,
-    "every_score":[4,0],
-    "total_score":4,
-    "index":4,
-    "score_height":4,
-    "score_width":18,
-    "score_dot":[637.3884985835693,467.41742209631735],
-    "page":1
-  },
-  {
-    "type":"fill",
-    "name":"填空题",
-    "num":1,
-    "score":"4;0",
-    "start":15,
-    "dot":[33.99,508.493909348442],
-    "height":38.243626062322946,
-    "width":521.81,
-    "every_height":22.6628895184136,
-    "every_width":521.81,
-    "padding":0,
-    "every_score":[4,0],
-    "total_score":4,
-    "index":5,
-    "score_height":4,
-    "score_width":18,
-    "score_dot":[637.3884985835693,505.6610481586403],
-    "page":1
-  },
-  {
-    "type":"fill",
-    "name":"填空题",
-    "num":1,
-    "score":"4;0",
-    "start":16,
-    "dot":[33.99,546.737535410765],
-    "height":38.243626062322946,
-    "width":521.81,
-    "every_height":22.6628895184136,
-    "every_width":521.81,
-    "padding":0,
-    "every_score":[4,0],
-    "total_score":4,
-    "index":6,
-    "score_height":4,
-    "score_width":18,
-    "score_dot":[637.3884985835693,543.9046742209632],
-    "page":1
-  },
-  {
-    "type":"answer",
-    "name":"解答题",
-    "num":1,
-    "score":"6",
-    "start":17,
-    "dot":[33.99,584.9811614730879],
-    "height":180.38404178648648,
-    "width":521.81,
-    "every_height":135.97733711048159,
-    "every_width":521.81,
-    "padding":0,
-    "every_score":[6,5,4,3,2,1,0],
-    "total_score":"6",
-    "index":7,
-    "score_height":4,
-    "score_width":63,
-    "score_dot":[509.9097450424929,582.1483002832862],
-    "page":1
-  },
-  {
-    "type":"answer",
-    "name":"解答题",
-    "num":1,
-    "score":"6",
-    "start":18,
-    "dot":[33.99,53.8243626062323],
-    "height":226.05233300747105,
-    "width":521.81,
-    "every_height":135.97733711048159,
-    "every_width":521.81,
-    "padding":0,
-    "every_score":[6,5,4,3,2,1,0],
-    "total_score":"6",
-    "index":8,
-    "score_height":4,
-    "score_width":63,
-    "score_dot":[509.9097450424929,762.5323420697727],
-    "page":2
-  },
-  {
-    "type":"answer",
-    "name":"解答题",
-    "num":1,
-    "score":"6",
-    "start":19,
-    "dot":[33.99,279.87669561370336],
-    "height":204.64532149763454,
-    "width":521.81,
-    "every_height":135.97733711048159,
-    "every_width":521.81,
-    "padding":0,
-    "every_score":[6,5,4,3,2,1,0],
-    "total_score":"6",
-    "index":9,
-    "score_height":4,
-    "score_width":63,
-    "score_dot":[509.9097450424929,1036.393667449212],
-    "page":2
-  },
-  {
-    "type":"answer",
-    "name":"解答题",
-    "num":1,
-    "score":"8",
-    "start":20,
-    "dot":[33.99,484.5220171113379],
-    "height":283.13769703370184,
-    "width":521.81,
-    "every_height":135.97733711048159,
-    "every_width":521.81,
-    "padding":0,
-    "every_score":[8,7,6,5,4,3,2,1,0],
-    "total_score":"8",
-    "index":10,
-    "score_height":4,
-    "score_width":81,
-    "score_dot":[458.9182436260623,1241.0389889468465],
-    "page":2
-  },
-  {
-    "type":"answer",
-    "name":"解答题",
-    "num":1,
-    "score":"8",
-    "start":21,
-    "dot":[33.99,53.8243626062323],
-    "height":326.6652871037027,
-    "width":521.81,
-    "every_height":135.97733711048159,
-    "every_width":521.81,
-    "padding":0,
-    "every_score":[8,7,6,5,4,3,2,1,0],
-    "total_score":"8",
-    "index":11,
-    "score_height":4,
-    "score_width":81,
-    "score_dot":[458.9182436260623,1524.1766859805484],
-    "page":3
-  },
-  {
-    "type":"answer",
-    "name":"解答题",
-    "num":1,
-    "score":"10",
-    "start":22,
-    "dot":[33.99,380.489649709935],
-    "height":382.3235170292776,
-    "width":521.81,
-    "every_height":135.97733711048159,
-    "every_width":521.81,
-    "padding":0,
-    "every_score":[1,"",9,8,7,6,5,4,3,2,1,0],
-    "total_score":"10",
-    "index":12,
-    "score_height":4,
-    "score_width":108,
-    "score_dot":[382.43099150141643,1850.841973084251],
-    "page":3
-  },
-  {
-    "type":"answer",
-    "name":"解答题",
-    "num":1,
-    "score":"10",
-    "start":23,
-    "dot":[33.99,53.8243626062323],
-    "height":355.20796911681816,
-    "width":521.81,
-    "every_height":135.97733711048159,
-    "every_width":521.81,
-    "padding":0,
-    "every_score":[1,"",9,8,7,6,5,4,3,2,1,0],
-    "total_score":"10",
-    "index":13,
-    "score_height":4,
-    "score_width":108,
-    "score_dot":[382.43099150141643,2233.1654901135284],
-    "page":4
-  },
-  {
-    "type":"answer",
-    "name":"解答题",
-    "num":1,
-    "score":"12",
-    "start":24,
-    "dot":[33.99,409.03233172305045],
-    "height":350.92656681485084,
-    "width":521.81,
-    "every_height":135.97733711048159,
-    "every_width":521.81,
-    "padding":0,
-    "every_score":["1","",9,8,7,6,5,4,3,2,1,0],
-    "total_score":"12",
-    "index":14,
-    "score_height":4,
-    "score_width":108,
-    "score_dot":[382.43099150141643,2588.3734592303467],
-    "page":4
-  }
+    {
+        "type":"select",
+        "name":"3",
+        "num":13,
+        "score":"3",
+        "start":1,
+        "dot":[46,1030.6456692913387],
+        "height":111.496062992126,
+        "width":681,
+        "every_height":15.118110236220472,
+        "every_width":120.94488188976378,
+        "padding":21.429921259842523,
+        "total_score":39,
+        "index":0,
+        "page":1
+    },
+    {
+        "type":"fill",
+        "name":"3",
+        "num":1,
+        "score":"3",
+        "start":14,
+        "dot":[46,1142.1417322834648],
+        "height":51.0236220472441,
+        "width":681,
+        "every_height":30.236220472440944,
+        "every_width":681,
+        "padding":0,
+        "every_score":[3,0],
+        "total_score":3,
+        "index":1,
+        "score_height":15.118110236220472,
+        "score_width":68.03149606299213,
+        "score_dot":[423.87308574617145,1138.3622047244096],
+        "page":1
+    },
+    {
+        "type":"fill",
+        "name":"3",
+        "num":1,
+        "score":"3",
+        "start":15,
+        "dot":[46,1193.1653543307089],
+        "height":51.0236220472441,
+        "width":681,
+        "every_height":30.236220472440944,
+        "every_width":681,
+        "padding":0,
+        "every_score":[3,0],
+        "total_score":3,
+        "index":2,
+        "score_height":15.118110236220472,
+        "score_width":68.03149606299213,
+        "score_dot":[423.87308574617145,1189.3858267716537],
+        "page":1
+    },
+    {
+        "type":"answer",
+        "name":"3",
+        "num":1,
+        "score":"3;3;3",
+        "start":16,
+        "dot":[46,1244.188976377953],
+        "height":224.88188976377955,
+        "width":681,
+        "every_height":48,
+        "every_width":681,
+        "padding":0,
+        "every_score":[3,2,1,0],
+        "total_score":"3",
+        "index":3,
+        "score_height":15.118110236220472,
+        "score_width":136.06299212598427,
+        "score_dot":[0,1240.4094488188978],
+        "page":1
+    },
+    {
+        "type":"answer",
+        "name":"3",
+        "num":1,
+        "score":"3;3;3",
+        "start":17,
+        "dot":[46,1469.0708661417325],
+        "height":224.88188976377955,
+        "width":681,
+        "every_height":48,
+        "every_width":681,
+        "padding":0,
+        "every_score":[3,2,1,0],
+        "total_score":"3",
+        "index":4,
+        "score_height":15.118110236220472,
+        "score_width":136.06299212598427,
+        "score_dot":[0,1240.4094488188978],
+        "page":1
+    },
+    {
+        "type":"answer",
+        "name":"3",
+        "num":1,
+        "score":"3;3;3",
+        "start":18,
+        "dot":[46,83.14960629921259],
+        "height":224.88188976377955,
+        "width":681,
+        "every_height":48,
+        "every_width":681,
+        "padding":0,
+        "every_score":[3,2,1,0],
+        "total_score":"3",
+        "index":5,
+        "score_height":15.118110236220472,
+        "score_width":136.06299212598427,
+        "score_dot":[0,1240.4094488188978],
+        "page":2
+    },
+    {
+        "type":"select",
+        "name":"3",
+        "num":13,
+        "score":"3",
+        "start":19,
+        "dot":[46,308.0314960629921],
+        "height":111.496062992126,
+        "width":681,
+        "every_height":15.118110236220472,
+        "every_width":120.94488188976378,
+        "padding":21.429921259842523,
+        "total_score":39,
+        "index":6,
+        "page":2
+    },
+    {
+        "type":"judge",
+        "name":"3",
+        "num":13,
+        "score":"2",
+        "start":32,
+        "dot":[46,419.5275590551181],
+        "height":111.496062992126,
+        "width":681,
+        "every_height":15.118110236220472,
+        "every_width":75.59055118110237,
+        "padding":21.429921259842523,
+        "total_score":26,
+        "index":7,
+        "page":2
+    }
 ]
 
 def get_file():
@@ -340,7 +192,7 @@ def conver_img():
 
 index_h = 1684 / 1124.52
 index_w = 1191 / 810.81
-width_less = -25
+width_less = 4
 height_less = 0
 
 # 存储图片
@@ -366,10 +218,10 @@ def cut_sn():
         jpg_name_dict = jpg.replace(".jpg", "").split("-")
         if int(jpg_name_dict[1]) % 4 == 1:
             img = cv2.imread(r"{0}".format(path + "\\" + jpg))
-            sn_w = 630 + width_less
-            sn_y = 37.795 + height_less
+            sn_w = 600 + width_less
+            sn_y = 40 + height_less
             sn_height = 16
-            sn_width = 135
+            sn_width = 115
             print(int(sn_y * index_h))
             print(int(sn_w * index_w))
             crop_img = img[int(sn_y * index_h): int((sn_y + sn_height) * index_h),
@@ -382,10 +234,10 @@ def cut_no():
         jpg_name_dict = jpg.replace(".jpg", "").split("-")
         if int(jpg_name_dict[1]) % 4 == 1:
             img = cv2.imread(r"{0}".format(path + "\\" + jpg))
-            sn_w = 574.016 + width_less
-            sn_y = 140.822 + height_less
-            sn_height = 215
-            sn_width = 205
+            sn_w = 530 + width_less
+            sn_y = 154 + height_less
+            sn_height = 200
+            sn_width = 235
             print(int(sn_y * index_h))
             print(int(sn_w * index_w))
             crop_img = img[int(sn_y * index_h): int((sn_y + sn_height) * index_h),
@@ -507,7 +359,25 @@ def cut_fill_all():
 
 # 剪裁ocr填空
 def cut_fill_ocr():
-    pass
+    for sheet in sheet_json:
+        if sheet["type"] == "fill":
+            page = sheet["page"]
+            for name in name_dir:
+                i = 0
+                jpg_name = name + "-" + str(i + page) + ".jpg"
+                while jpg_name in jpg_dir:
+                    select_x = sheet["score_dot"][0] + width_less
+                    select_y = sheet["score_dot"][1] + height_less
+                    img = cv2.imread(path + "\\" + jpg_name)
+                    crop_img = img[int(select_y * index_h): int(
+                        (select_y + sheet["score_height"]) * index_h),
+                               int(select_x * index_w): int(
+                                   (select_x + sheet["score_width"]) * index_w)]
+                    label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"], str(int(i / 4)),
+                                                                     str(sheet["index"] + 1), str(1)), name)
+
+                    i = i + 4
+                    jpg_name = name + "-" + str(i + page) + ".jpg"
 
 # 剪裁全量简答
 def cut_answer_all():
@@ -533,7 +403,25 @@ def cut_answer_all():
 
 # 剪裁ocr简答
 def cut_answer_ocr():
-    pass
+    for sheet in sheet_json:
+        if sheet["type"] == "answer":
+            page = sheet["page"]
+            for name in name_dir:
+                i = 0
+                jpg_name = name + "-" + str(i + page) + ".jpg"
+                while jpg_name in jpg_dir:
+                    select_x = sheet["score_dot"][0] + width_less
+                    select_y = sheet["score_dot"][1] + height_less
+                    img = cv2.imread(path + "\\" + jpg_name)
+                    crop_img = img[int(select_y * index_h): int(
+                        (select_y + sheet["score_height"]) * index_h),
+                               int(select_x * index_w): int(
+                                   (select_x + sheet["score_width"]) * index_w)]
+                    label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"], str(int(i / 4)),
+                                                                     str(sheet["index"] + 1), str(1)), name)
+
+                    i = i + 4
+                    jpg_name = name + "-" + str(i + page) + ".jpg"
 
 
 if __name__ == '__main__':
@@ -546,3 +434,9 @@ if __name__ == '__main__':
     cut_sn()
     cut_no()
     cut_select()
+    cut_judge()
+    cut_multi()
+    cut_fill_all()
+    cut_answer_all()
+    cut_fill_ocr()
+    cut_answer_ocr()

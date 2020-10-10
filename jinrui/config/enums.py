@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from FanstiBgs.extensions.base_enum import Enum
+from ..extensions.base_enum import Enum
 
 
 class TestEnum(Enum):

@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from FanstiBgs.config.enums import TestEnum
-from FanstiBgs.extensions.success_response import Success
+from ..config.enums import TestEnum
+from ..extensions.success_response import Success
 
 
 class CHello(object):
