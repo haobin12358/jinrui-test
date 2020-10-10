@@ -129,5 +129,5 @@ dmypy.json
 .pyre/
 
 .idea/
-FanstiBgs/config/secret.py
-FanstiBgs/config/http_config.py
+jinrui-test/config/secret.py
+jinrui-test/config/http_config.py
