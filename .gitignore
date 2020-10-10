@@ -127,3 +127,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+.idea/
+FanstiBgs/config/secret.py
+FanstiBgs/config/http_config.py
