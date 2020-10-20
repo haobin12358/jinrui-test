@@ -2,9 +2,9 @@
 from flask import current_app
 from sqlalchemy import false
 from datetime import timedelta
-from FanstiBgs.config.enums import ActivityStatus, UserActivityStatus, OrderMainStatus, CourseStatus, CouponStatus, \
+from jinrui.config.enums import ActivityStatus, UserActivityStatus, OrderMainStatus, CourseStatus, CouponStatus, \
     CouponUserStatus, ProductType, ProductStatus
-from FanstiBgs.extensions.register_ext import celery, db, conn
+from jinrui.extensions.register_ext import celery, db, conn
 
 
 def add_async_task(func, start_time, func_args, conn_id=None, queue='high_priority'):

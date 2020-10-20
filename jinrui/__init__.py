@@ -6,6 +6,7 @@ from flask_cors import CORS
 
 from .api.AHello import AHello
 from .api.AOcr import AOcr
+from .api.APpt import APpt
 
 from .extensions.request_handler import error_handler, request_first_handler
 from .config.secret import DefaltSettig
@@ -18,6 +19,7 @@ def register(app):
     jr = Blueprint(__name__, 'jr', url_prefix='/api')
     jr.add_url_rule('/hello/<string:hello>', view_func=AHello.as_view('hello'))
     jr.add_url_rule('/ocr/<string:ocr>', view_func=AOcr.as_view('ocr'))
+    jr.add_url_rule('/ppt/<string:ppt>', view_func=APpt.as_view('ppt'))
     app.register_blueprint(jr)
 
 

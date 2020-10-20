@@ -5,8 +5,8 @@ from datetime import datetime
 from sqlalchemy import orm, Column as _Column, Boolean, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import create_engine
-from FanstiBgs.config.http_config import MEDIA_HOST, HTTP_HOST
-from FanstiBgs.extensions.register_ext import db
+from jinrui.config.http_config import MEDIA_HOST, HTTP_HOST
+from jinrui.extensions.register_ext import db
 from .error_response import NotFound
 from ..config.secret import DB_PARAMS
 

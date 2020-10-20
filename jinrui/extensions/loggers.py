@@ -7,8 +7,8 @@ from logging.handlers import TimedRotatingFileHandler
 
 from flask import current_app
 
-from FanstiBgs.extensions.error_response import BaseError, SystemError
-from FanstiBgs.extensions.success_response import Success
+from jinrui.extensions.error_response import BaseError, SystemError
+from jinrui.extensions.success_response import Success
 
 
 class MyTimedRotatingFileHandler(TimedRotatingFileHandler):

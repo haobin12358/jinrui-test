@@ -1,5 +1,5 @@
 from flask import request
-from FanstiBgs.extensions.error_response import AuthorityError, TokenError
+from jinrui.extensions.error_response import AuthorityError, TokenError
 
 
 def is_anonymous():

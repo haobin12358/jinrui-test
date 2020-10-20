@@ -4,10 +4,10 @@ import redis
 from contextlib import contextmanager
 from flask_celery import Celery
 from flask_sqlalchemy import SQLAlchemy as _SQLAlchemy
-from FanstiBgs.extensions.aliyunoss.storage import AliyunOss
-from FanstiBgs.extensions.weixin import WeixinPay
+from jinrui.extensions.aliyunoss.storage import AliyunOss
+from jinrui.extensions.weixin import WeixinPay
 from .query_session import Query
-from FanstiBgs.config.secret import DB_PARAMS, SERVICE_APPID, SERVICE_APPSECRET, server_dir, ACCESS_KEY_ID, \
+from jinrui.config.secret import DB_PARAMS, SERVICE_APPID, SERVICE_APPSECRET, server_dir, ACCESS_KEY_ID, \
     ACCESS_KEY_SECRET, ALIOSS_BUCKET_NAME, ALIOSS_ENDPOINT, appid, mch_id, mch_key, wxpay_notify_url, apiclient_key, \
     apiclient_cert
 from .loggers import LoggerHandler
@@ -45,7 +45,7 @@ celery = Celery()
 conn = redis.Redis(host='localhost', port=6379, db=1)
 
 
-def register_ext(app, logger_file='/tmp/fanstibgs/'):
+def register_ext(app, logger_file='/tmp/jinrui/'):
     db.init_app(app)
     celery.init_app(app)
     LoggerHandler(app, file=logger_file).error_handler()
