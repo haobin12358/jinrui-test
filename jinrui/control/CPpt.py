@@ -6,7 +6,7 @@ from pptx.util import Inches
 from flask import current_app
 
 from ..extensions.success_response import SuccessCode
-from ..extensions.error_response import NoPaper, NoQuestion, ClassNoStudent, NoAnswer, NoErrCode
+from ..extensions.error_response import NoQuestion, ClassNoStudent, NoAnswer, NoErrCode
 from ..extensions.params_validates import parameter_required
 from jinrui.models.jinrui import j_question, j_paper, j_student, j_answer_booklet, j_score
 from jinrui.config.secret import ACCESS_KEY_ID, ACCESS_KEY_SECRET, ALIOSS_BUCKET_NAME, ALIOSS_ENDPOINT
@@ -140,12 +140,38 @@ class CPpt():
                                 # 移除图片
                                 os.remove(pic_save_path)
                             else:
-                                width = Inches(len(row) / 4 + 2)
-                                current_app.logger.info(">>>>>>>>>>>>>>>>>>width:" + str(width))
-                                txBox = slide.shapes.add_textbox(left, top, width, height)
-                                tf = txBox.text_frame
-                                tf.text = row
-                                left = left + width
+                                width = Inches(len(row) / 4)
+                                if left + width > Inches(12):
+                                    use_width = Inches(12) - left
+                                    from pptx.util import Length
+                                    use_word = Length(4 * use_width).inches
+                                    txBox = slide.shapes.add_textbox(left, top, use_width, height)
+                                    tf = txBox.text_frame
+                                    tf.text = row[0: int(use_word)]
+                                    left = Inches(0.5)
+                                    top = top + Inches(0.5)
+                                    other_word_num = len(row) - use_word
+                                    if other_word_num % 36 == 0:
+                                        perform = other_word_num / 36
+                                    else:
+                                        perform = int(other_word_num / 36) + 1
+                                    i = 0
+                                    while i < perform:
+                                        txBox = slide.shapes.add_textbox(left, top,
+                                                                         Inches(len(row[int(use_word) + 1 + 36 * i:
+                                                                                        int(use_word) + 36 * (
+                                                                                                    i + 1) + 1]) / 4),
+                                                                         height)
+                                        tf = txBox.text_frame
+                                        tf.text = row[int(use_word) + 1 + 36 * i: int(use_word) + 36 * (i + 1) + 1]
+                                        left = Inches(0.5)
+                                        top = top + Inches(0.5)
+                                        i += 1
+                                else:
+                                    txBox = slide.shapes.add_textbox(left, top, width, height)
+                                    tf = txBox.text_frame
+                                    tf.text = row
+                                    left = left + width
                 left = Inches(0.5)
                 top = top + Inches(0.5)
 
@@ -188,12 +214,38 @@ class CPpt():
                                 left = left + pic_width * height / pic_height
                                 os.remove(pic_save_path)
                             else:
-                                width = Inches(len(row) / 4 + 2)
-                                current_app.logger.info(">>>>>>>>>>>>>>>>>>width:" + str(width))
-                                txBox = slide.shapes.add_textbox(left, top, width, height)
-                                tf = txBox.text_frame
-                                tf.text = row
-                                left = left + width
+                                width = Inches(len(row) / 4)
+                                if left + width > Inches(12):
+                                    use_width = Inches(12) - left
+                                    from pptx.util import Length
+                                    use_word = Length(4 * use_width).inches
+                                    txBox = slide.shapes.add_textbox(left, top, use_width, height)
+                                    tf = txBox.text_frame
+                                    tf.text = row[0: int(use_word)]
+                                    left = Inches(0.5)
+                                    top = top + Inches(0.5)
+                                    other_word_num = len(row) - use_word
+                                    if other_word_num % 36 == 0:
+                                        perform = other_word_num / 36
+                                    else:
+                                        perform = int(other_word_num / 36) + 1
+                                    i = 0
+                                    while i < perform:
+                                        txBox = slide.shapes.add_textbox(left, top,
+                                                                         Inches(len(row[int(use_word) + 1 + 36 * i:
+                                                                                        int(use_word) + 36 * (
+                                                                                                    i + 1) + 1]) / 4),
+                                                                         height)
+                                        tf = txBox.text_frame
+                                        tf.text = row[int(use_word) + 1 + 36 * i: int(use_word) + 36 * (i + 1) + 1]
+                                        left = Inches(0.5)
+                                        top = top + Inches(0.5)
+                                        i += 1
+                                else:
+                                    txBox = slide.shapes.add_textbox(left, top, width, height)
+                                    tf = txBox.text_frame
+                                    tf.text = row
+                                    left = left + width
                 left = Inches(0.5)
                 top = top + Inches(0.5)
         prs.save(pic_path + "ppt-" + ppt_uuid + ".pptx")

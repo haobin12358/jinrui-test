@@ -20,7 +20,7 @@ bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
 
 
 if __name__ == "__main__":
-    question = "<div>1．【实数的有关概念与大小比较】下列各数中最大的数是()</div><div>A．－6B.<img src='https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image1_5882183080153088.png'></img>C．πD．0</div>"
+    question = "<div>9．【图形变换】如图6，Rt△ABC中，∠BAC＝90°，AB＝AC，将△ABC绕点C顺时针旋转40°得到△A′B′C，CB′与AB相交于点D，连结AA′，则∠B′A′A的度数为()</div><div>A．10° B．15° C．20° D．30°</div>"
     answer = "<div>1．C【解析】 ∵π＞<img src='https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image1_5881953458786304.png'></img>＞0＞－6，∴所给的各数中最大的数是π.</div>"
     knowledge = "实数的有关概念与大小比较"
 
@@ -54,18 +54,47 @@ if __name__ == "__main__":
                         pic_width = img.shape[0]
                         pic_height = img.shape[1]
                         pic = slide.shapes.add_picture(pic_save_path, left, top, height=height)
-                        width = width + pic_width * height / pic_height
+                        left = left + pic_width * height / pic_height
                         os.remove(pic_save_path)
                     else:
-                        print(len(row))
-                        chinese_num = get_number(row)
-                        english_num = len(row) - chinese_num
-
-                        width = Inches((english_num + 2 * chinese_num + 2) / 8)
-                        txBox = slide.shapes.add_textbox(left, top, width, height)
-                        tf = txBox.text_frame
-                        tf.text = row
-                        left = left + width
-        left = Inches(0.5)
-        top = top + Inches(0.5)
+                        width = Inches(len(row) / 4 + 2)
+                        print(width)
+                        print(Inches(12))
+                        if left + width > Inches(12):
+                            use_width = Inches(12) - left
+                            print(use_width)
+                            from pptx.util import Length
+                            use_word = Length(4 * use_width).inches
+                            print(">>>>>>>>>>>>>>>>>use_word:" + str(use_word))
+                            txBox = slide.shapes.add_textbox(left, top, use_width, height)
+                            tf = txBox.text_frame
+                            print(row)
+                            tf.text = row[0: int(use_word)]
+                            left = Inches(0.5)
+                            top = top + Inches(0.5)
+                            other_word_num = len(row) - use_word
+                            if other_word_num % 36 == 0:
+                                perform = other_word_num / 36
+                            else:
+                                perform = int(other_word_num / 36) + 1
+                            i = 0
+                            while i < perform:
+                                txBox = slide.shapes.add_textbox(left, top,
+                                                                 Inches(len(row[int(use_word) + 1 + 36 * i:
+                                                                                int(use_word) + 36 * (i + 1) + 1]) / 4 + 2),
+                                                                 height)
+                                tf = txBox.text_frame
+                                tf.text = row[int(use_word) + 1 + 36 * i: int(use_word) + 36 * (i + 1) + 1]
+                                left = Inches(0.5)
+                                top = top + Inches(0.5)
+                                i += 1
+                        else:
+                            txBox = slide.shapes.add_textbox(left, top, width, height)
+                            tf = txBox.text_frame
+                            tf.text = row
+                            left = left + width
+            left = Inches(0.5)
+            top = top + Inches(0.5)
     prs.save('D:\\test.pptx')
+
+    e = Inches(12)
