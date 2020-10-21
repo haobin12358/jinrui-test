@@ -34,66 +34,86 @@ class BaseError(HTTPException):
     def args(self):
         return self.message
 
-
-class DbError(BaseError):
+class BaseErrorCode(HTTPException):
     message = '系统错误'
-    status = 404
+    code = 404
+    success = False
+    data = None
 
+    def __init__(self, message=None, code=None, success=None, header=None, *args, **kwargs):
+        self.code = 200
+        if message:
+            self.message = message
+        if success:
+            self.success = success
+        if code:
+            self.code = code
+        super(BaseErrorCode, self).__init__(message, None)
 
-class DumpliError(BaseError):
-    message = '重复数据'
-    status = 404
-    status_code = 405008
+    def get_body(self, environ=None):
+        body = dict(
+            code=self.code,
+            message=self.message,
+            success=self.success
+        )
+        text = json.dumps(body)
+        return text
 
+    def get_headers(self, environ=None):
+        return [('Content-Type', 'application/json')]
 
-class ParamsError(BaseError):
-    status = 405
-    status_code = 405001
-    message = '参数缺失'
+    @property
+    def args(self):
+        return self.message
 
-
-class TokenError(BaseError):
-    status = 405
-    status_code = 405007
-    message = "未登录"
-
-
-class MethodNotAllowed(BaseError):
-    status = 405
-    status_code = 405002
+class MethodNotAllowed(BaseErrorCode):
+    code = 405
+    success = False
     message = "方法不支持"
 
 
-class AuthorityError(BaseError):
-    status = 405
-    status_code = 405003
-    message = "无权限"
-
-
-class NotFound(BaseError):
-    status = 404
-    status_code = 405004
-    message = '无此项目'
-
-
-class SystemError(BaseError):
-    status_code = 405005
+class SystemError(BaseErrorCode):
+    code = 405
     message = '系统错误'
-    status = 405
+    success = False
 
 
-class ApiError(BaseError):
-    status = 405
-    status_code = 405006
+class ApiError(BaseErrorCode):
+    code = 405
+    success = False
     message = "接口未注册"
 
+class ParamsError(BaseErrorCode):
+    code = 405
+    success = False
+    message = "参数缺失"
 
-class NoPreservationError(BaseError):
-    status = 405
-    status_code = 405101
-    message = "请直接输入板号查询"
+class NoPaper(BaseErrorCode):
+    code = 405
+    success = False
+    message = "未找到该试卷"
 
-class ErrorGetNetwork(BaseError):
-    status = 405
-    status_code = 405102
-    message = "爬虫获取cas失败"
+class NoQuestion(BaseErrorCode):
+    code = 405
+    success = False
+    message = "该试卷题目解析失败，请联系管理员..."
+
+class ClassNoStudent(BaseErrorCode):
+    code = 405
+    success = False
+    message = "该班级无学生"
+
+class NoAnswer(BaseErrorCode):
+    code = 405
+    success = False
+    message = "讲义生成中，请稍后..."
+
+class NoErrCode(BaseErrorCode):
+    code = 405
+    success = False
+    message = "该错误率以上无题目，请重新选择..."
+
+class NotFound(BaseErrorCode):
+    code = 405
+    success = False
+    message = "未找到该内容"

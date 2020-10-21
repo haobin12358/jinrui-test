@@ -5,10 +5,9 @@ from pptx import Presentation
 from pptx.util import Inches
 from flask import current_app
 
-from ..extensions.success_response import Success
+from ..extensions.success_response import SuccessCode
+from ..extensions.error_response import NoPaper, NoQuestion, ClassNoStudent, NoAnswer, NoErrCode
 from ..extensions.params_validates import parameter_required
-from jinrui.extensions.register_ext import db
-from jinrui.extensions.register_ext import ali_oss
 from jinrui.models.jinrui import j_question, j_paper, j_student, j_answer_booklet, j_score
 from jinrui.config.secret import ACCESS_KEY_ID, ACCESS_KEY_SECRET, ALIOSS_BUCKET_NAME, ALIOSS_ENDPOINT
 
@@ -22,20 +21,12 @@ class CPpt():
         args = parameter_required(("paperName", "classId", "errRate"))
 
         # 获取试卷
-        paper = j_paper.query.filter(j_paper.name == args.get("paperName")).first()
-        if not paper:
-            return {
-                "code": 405,
-                "message": "未找到该试卷"
-            }
+        paper = j_paper.query.filter(j_paper.name == args.get("paperName")).first_("未找到该试卷")
         paper_id = paper.id
         # 获取题目列表
         question_list = j_question.query.filter(j_question.paper_id == paper_id).all()
         if not question_list:
-            return {
-                "code": 405,
-                "message": "该试卷题目解析失败，请联系管理员..."
-            }
+            return NoQuestion()
         # 题号list
         question_num_list = []
         # 分数list
@@ -51,10 +42,7 @@ class CPpt():
         for student in student_list:
             student_id_list.append(student.id)
         if not student_id_list:
-            return {
-                "code": 405,
-                "message": "该班级无学生"
-            }
+            return ClassNoStudent()
         current_app.logger.info(">>>>>>>>>>>>>>>>>>>>>>>>>student_id_list:" + str(student_id_list))
         answer_id_list = []
         for student_id in student_id_list:
@@ -70,10 +58,7 @@ class CPpt():
         # 总答卷数目
         total_answer_booklet = len(answer_id_list)
         if total_answer_booklet == 0:
-            return {
-                "code": 405,
-                "message": "讲义生成中，请稍后..."
-            }
+            return NoAnswer()
         # 要生成ppt的question列表
         ppt_question_number_list = []
         i = 0
@@ -91,10 +76,7 @@ class CPpt():
             i = i + 1
         ppt_question_number_list.sort()
         if not ppt_question_number_list:
-            return {
-                "code": 405,
-                "message": "该错误率以上无题目，请重新选择..."
-            }
+            return NoErrCode()
         # ppt用到的题目答案列表
         question_answer_list = []
         for question_number in ppt_question_number_list:

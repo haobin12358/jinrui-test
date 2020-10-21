@@ -6,7 +6,7 @@ from sqlalchemy import inspection, log, util
 from sqlalchemy.orm import Query as _Query, Session as _Session
 from sqlalchemy.sql.sqltypes import NullType
 
-from .error_response import ParamsError, NotFound, SystemError
+from .error_response import ParamsError, SystemError
 
 
 @inspection._self_inspects
@@ -53,7 +53,7 @@ class Query(_Query):
         res = super(Query, self).first()
         if res or error is None:
             return res
-        raise NotFound(error)
+        raise ParamsError(error)
 
     def order_by(self, *criterion, origin=False):
         """默认在筛选条件中添加对象主键，防止与limit连用时出现获取随机位移错误"""
