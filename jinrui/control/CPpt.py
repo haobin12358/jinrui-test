@@ -18,16 +18,24 @@ class CPpt():
         """
         获取错题ppt
         """
-        current_app.logger.info(datetime.now())
+        current_app.logger.info(">>>>>>>>>>>>>>>>>>start_time:" + str(datetime.now()))
         args = parameter_required(("paperName", "classId", "errRate"))
 
         # 获取试卷
-        paper = j_paper.query.filter(j_paper.name == args.get("paperName")).first_("未找到该试卷")
+        paper = j_paper.query.filter(j_paper.name == args.get("paperName")).first()
+        if not paper:
+            return {
+                "code": 405,
+                "message": "未找到该试卷"
+            }
         paper_id = paper.id
-
         # 获取题目列表
         question_list = j_question.query.filter(j_question.paper_id == paper_id).all()
-
+        if not question_list:
+            return {
+                "code": 405,
+                "message": "该试卷题目解析失败，请联系管理员..."
+            }
         # 题号list
         question_num_list = []
         # 分数list
@@ -35,7 +43,6 @@ class CPpt():
         for question in question_list:
             question_num_list.append(question.question_number)
             question_score_list.append(question.score)
-
         current_app.logger.info(">>>>>>>>>>>>>>>>>>>>>>>>>question_num_list:" + str(question_num_list))
         current_app.logger.info(">>>>>>>>>>>>>>>>>>>>>>>>>question_score_list:" + str(question_score_list))
         # 学生list
@@ -43,7 +50,11 @@ class CPpt():
         student_list = j_student.query.filter(j_student.org_id == args.get("classId")).all()
         for student in student_list:
             student_id_list.append(student.id)
-
+        if not student_id_list:
+            return {
+                "code": 405,
+                "message": "该班级无学生"
+            }
         current_app.logger.info(">>>>>>>>>>>>>>>>>>>>>>>>>student_id_list:" + str(student_id_list))
         answer_id_list = []
         for student_id in student_id_list:
@@ -55,10 +66,14 @@ class CPpt():
             answer_booklet_list = j_answer_booklet.query.filter(*filter_args).all()
             for answer_booklet_item in answer_booklet_list:
                 answer_id_list.append(answer_booklet_item.id)
-
         current_app.logger.info(">>>>>>>>>>>>>>>>>>>>>>>>>answer_id_list:" + str(answer_id_list))
         # 总答卷数目
         total_answer_booklet = len(answer_id_list)
+        if total_answer_booklet == 0:
+            return {
+                "code": 405,
+                "message": "讲义生成中，请稍后..."
+            }
         # 要生成ppt的question列表
         ppt_question_number_list = []
         i = 0
@@ -74,9 +89,12 @@ class CPpt():
             if (total_answer_booklet - j) / total_answer_booklet > float(args.get("errRate")) / 100:
                 ppt_question_number_list.append(int(question_num_list[i]))
             i = i + 1
-
         ppt_question_number_list.sort()
-
+        if not ppt_question_number_list:
+            return {
+                "code": 405,
+                "message": "该错误率以上无题目，请重新选择..."
+            }
         # ppt用到的题目答案列表
         question_answer_list = []
         for question_number in ppt_question_number_list:
@@ -86,47 +104,39 @@ class CPpt():
             question_answer_dict["question"] = ppt_question_answer.content
             question_answer_dict["answer"] = ppt_question_answer.answer
             question_answer_dict["knowledge"] = ppt_question_answer.knowledge
-
             question_answer_list.append(question_answer_dict)
-
         current_app.logger.info(">>>>>>>>>>>>>>>>>>>question_answer_list:" + str(question_answer_list))
         # 阿里云oss参数
         auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
         bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
-
         # 创建ppt
         prs = Presentation()
-        # ppt样式
+        # ppt样式-空白
         blank_slide_layout = prs.slide_layouts[6]
-
         ppt_uuid = str(uuid.uuid1())
+        # 设置临时存储路径
         if platform.system() == "Windows":
             pic_path = "D:\\jinrui_pic\\" + ppt_uuid + "\\"
         else:
             pic_path = "/tmp/jinrui_pic/" + ppt_uuid + "/"
         if not os.path.exists(pic_path):
             os.makedirs(pic_path)
-
-
+        # 遍历题目-答案-考点
         for question_answer in question_answer_list:
             # 创建幻灯片
             slide = prs.slides.add_slide(blank_slide_layout)
+            # 设置幻灯片背景
+            img_path = os.path.abspath("jinrui/control/ppt.jpg")
+            back_pic = slide.shapes.add_picture(img_path, Inches(0), Inches(0), width=prs.slide_width,
+                                                height=prs.slide_height)
+            slide.shapes._spTree.remove(back_pic._element)
+            slide.shapes._spTree.insert(2, back_pic._element)
 
-            question_dict = question_answer["question"].split("<div>")
             # 设置顶点尺寸
             left = top = Inches(0.5)
-
-
+            question_dict = question_answer["question"].split("<div>")
             for question_item in question_dict:
                 if question_item:
-                    # 创建背景
-                    current_app.logger.info(os.path.abspath("jinrui/control/ppt.jpg"))
-                    img_path = os.path.abspath("jinrui/control/ppt.jpg")
-                    back_pic = slide.shapes.add_picture(img_path, Inches(0), Inches(0), width=prs.slide_width,
-                                                        height=prs.slide_height)
-                    slide.shapes._spTree.remove(back_pic._element)
-                    slide.shapes._spTree.insert(2, back_pic._element)
-
                     question_item = question_item.replace("</div>", "#####").replace("<img src='", "#####").replace(
                         "'></img>", "#####")
                     question_item_dict = question_item.split("#####")
@@ -144,15 +154,10 @@ class CPpt():
                                 pic_height = img.shape[1]
                                 # 添加图片到ppt中
                                 pic = slide.shapes.add_picture(pic_save_path, left, top, height=height)
-                                width = width + pic_width * height / pic_height
+                                left = left + pic_width * height / pic_height
                                 # 移除图片
                                 os.remove(pic_save_path)
                             else:
-                                # chinese_num = self._get_number(row)
-                                # print(">>>>>>>>>>>>>>>>>>chinese_num:" + str(chinese_num))
-                                # english_num = len(row) - chinese_num
-                                # print(">>>>>>>>>>>>>>>>>>english_num:" + str(english_num))
-
                                 width = Inches(len(row) / 4 + 2)
                                 current_app.logger.info(">>>>>>>>>>>>>>>>>>width:" + str(width))
                                 txBox = slide.shapes.add_textbox(left, top, width, height)
@@ -162,21 +167,27 @@ class CPpt():
                 left = Inches(0.5)
                 top = top + Inches(0.5)
 
+            # 创建幻灯片
             slide = prs.slides.add_slide(blank_slide_layout)
-            answer_dict = question_answer["answer"].split("<div>")
+            # 创建背景
+            img_path = os.path.abspath("jinrui/control/ppt.jpg")
+            back_pic = slide.shapes.add_picture(img_path, Inches(0), Inches(0), width=prs.slide_width,
+                                                height=prs.slide_height)
+            slide.shapes._spTree.remove(back_pic._element)
+            slide.shapes._spTree.insert(2, back_pic._element)
+
             # 设置顶点尺寸
             left = top = Inches(0.5)
-
+            # 考点与答案同页面
+            knowledge = "考点：【" + question_answer["knowledge"] + "】"
+            txBox = slide.shapes.add_textbox(left, top, Inches(1), Inches(0.4))
+            tf = txBox.text_frame
+            tf.text = knowledge
+            answer_dict = question_answer["answer"].split("<div>")
+            # 考虑考点高度值，增加答案起始高度
+            top = Inches(1)
             for answer_item in answer_dict:
                 if answer_item:
-                    # 创建背景
-                    current_app.logger.info(os.path.abspath("jinrui/control/ppt.jpg"))
-                    img_path = os.path.abspath("jinrui/control/ppt.jpg")
-                    back_pic = slide.shapes.add_picture(img_path, Inches(0), Inches(0), width=prs.slide_width,
-                                                        height=prs.slide_height)
-                    slide.shapes._spTree.remove(back_pic._element)
-                    slide.shapes._spTree.insert(2, back_pic._element)
-
                     answer_item = answer_item.replace("</div>", "#####").replace("<img src='", "#####").replace(
                         "'></img>", "#####")
                     question_item_dict = answer_item.split("#####")
@@ -192,14 +203,9 @@ class CPpt():
                                 pic_width = img.shape[0]
                                 pic_height = img.shape[1]
                                 pic = slide.shapes.add_picture(pic_save_path, left, top, height=height)
-                                width = width + pic_width * height / pic_height
+                                left = left + pic_width * height / pic_height
                                 os.remove(pic_save_path)
                             else:
-                                # chinese_num = self._get_number(row)
-                                # print(">>>>>>>>>>>>>>>>>>chinese_num:" + str(chinese_num))
-                                # english_num = len(row) - chinese_num
-                                # print(">>>>>>>>>>>>>>>>>>english_num:" + str(english_num))
-
                                 width = Inches(len(row) / 4 + 2)
                                 current_app.logger.info(">>>>>>>>>>>>>>>>>>width:" + str(width))
                                 txBox = slide.shapes.add_textbox(left, top, width, height)
@@ -212,20 +218,15 @@ class CPpt():
 
         ppt_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + "ppt-" + ppt_uuid + ".pptx"
         result = bucket.put_object_from_file("ppt-" + ppt_uuid + ".pptx", pic_path + "ppt-" + ppt_uuid + ".pptx")
-        current_app.logger.info(result.status)
-        current_app.logger.info(ppt_url)
+        current_app.logger.info(">>>>>>>>>>>>>>>>>>>oss_status:" + str(result.status))
+        current_app.logger.info(">>>>>>>>>>>>>>>>>>>ppt_url:" + ppt_url)
         shutil.rmtree(pic_path)
-        current_app.logger.info(datetime.now())
-        return Success(data={"url": ppt_url})
-
-    def _get_number(self, div_str):
-        """
-        判断字符串中，中文的个数
-        :param char: 字符串
-        :return:
-        """
-        count = 0
-        for item in div_str:
-            if 0x4E00 <= ord(item) <= 0x9FA5:
-                count += 1
-        return count
+        current_app.logger.info(">>>>>>>>>>>>>>>>>>>end_time:" + str(datetime.now()))
+        return {
+            "code": 200,
+            "success": True,
+            "message": "获取成功",
+            "data": {
+                "url": ppt_url
+            }
+        }
