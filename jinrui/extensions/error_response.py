@@ -117,3 +117,8 @@ class NotFound(BaseErrorCode):
     code = 405
     success = False
     message = "未找到该内容"
+
+class UnknownQuestionType(BaseErrorCode):
+    code = 405
+    success = False
+    message = "未知的题目类型，请联系管理员"

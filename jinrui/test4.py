@@ -1,4 +1,4 @@
-import requests, json
+import requests, json, ctypes
 picture_json = {
  '19': 'https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/answerocr-0-10-1_5844315876036608.jpg',
  '20': 'https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/answerocr-0-11-1_5844317100773376.jpg',
@@ -92,9 +92,6 @@ for key in picture_json:
         "point": point_json[key],
         "notificationUrl": "https://jinrui.sanbinit.cn/api/ocr/mock_ocr_response?key=eyJhbGciOiJIUzI1NiIsImlhdCI6MTYwMjY1Njk1OCwiZXhwIjoxNjAzMjYxNzU4fQ.eyJ1c2VybmFtZSI6Ilx1OTBkZFx1NjU4YyIsImlkIjoiNWI0NmYyNjItZjBkOS0xMWVhLWFiMGUtNGNlZGZiNzk1OGEyIiwibW9kZWwiOiJVc2VyIiwibGV2ZWwiOiIwIn0.Bpy-Z0xuB1_1L8-KOkYUbws9faoDc9nfy6rArl8W7jM"
     }
-    response = requests.post(url=url, json=post_dict)
-    content = json.loads(response.content)
-    if content["status"] == 200:
-        print("success test:>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>" + key)
-    else:
-        print("error test:>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>" + key + ":" + str(content["status"]))
+
+so = ctypes.cdll.LoadLibrary('jinrui/libsheet-v0.0.1/lib/libsheet.so')
+so.process()
