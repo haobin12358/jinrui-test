@@ -122,3 +122,13 @@ class UnknownQuestionType(BaseErrorCode):
     code = 405
     success = False
     message = "未知的题目类型，请联系管理员"
+
+class ErrorFileType(BaseErrorCode):
+    code = 405
+    success = False
+    message = "错误的文件类型"
+
+class ErrorAnswerType(BaseErrorCode):
+    code = 405
+    success = False
+    message = "错误的答卷类型"
