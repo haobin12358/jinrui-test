@@ -3,11 +3,11 @@ from flask import Flask
 from flask import Blueprint
 from flask_cors import CORS
 
-
 from .api.AHello import AHello
 from .api.AOcr import AOcr
 from .api.APpt import APpt
 from .api.APaper import APaper
+from .api.AAnswer import AAnswer
 
 from .extensions.request_handler import error_handler, request_first_handler
 from .config.secret import DefaltSettig
@@ -22,6 +22,7 @@ def register(app):
     jr.add_url_rule('/ocr/<string:ocr>', view_func=AOcr.as_view('ocr'))
     jr.add_url_rule('/ppt/<string:ppt>', view_func=APpt.as_view('ppt'))
     jr.add_url_rule('/paper/<string:paper>', view_func=APaper.as_view('paper'))
+    jr.add_url_rule('/answer/<string:answer>', view_func=AAnswer.as_view('answer'))
     app.register_blueprint(jr)
 
 

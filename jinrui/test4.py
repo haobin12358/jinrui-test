@@ -93,5 +93,5 @@ for key in picture_json:
         "notificationUrl": "https://jinrui.sanbinit.cn/api/ocr/mock_ocr_response?key=eyJhbGciOiJIUzI1NiIsImlhdCI6MTYwMjY1Njk1OCwiZXhwIjoxNjAzMjYxNzU4fQ.eyJ1c2VybmFtZSI6Ilx1OTBkZFx1NjU4YyIsImlkIjoiNWI0NmYyNjItZjBkOS0xMWVhLWFiMGUtNGNlZGZiNzk1OGEyIiwibW9kZWwiOiJVc2VyIiwibGV2ZWwiOiIwIn0.Bpy-Z0xuB1_1L8-KOkYUbws9faoDc9nfy6rArl8W7jM"
     }
 
-so = ctypes.cdll.LoadLibrary('jinrui/libsheet-v0.0.1/lib/libsheet.so')
+so = ctypes.cdll.LoadLibrary('jinrui/libsheet/lib/libsheet.so')
 so.process()

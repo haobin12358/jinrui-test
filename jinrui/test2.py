@@ -4,72 +4,7 @@ import fitz
 pdf_dir = []
 
 path = "C:\\Users\\Administrator\\Desktop\\jinrui\\testsheet"
-sheet_json = [
-    {
-        "type":"answer",
-        "name":"3",
-        "num":1,
-        "score":"3",
-        "start":1,
-        "dot":[
-            46,
-            356
-        ],
-        "height":229.44094488188978,
-        "width":681,
-        "every_height":48,
-        "every_width":681,
-        "padding":0,
-        "show_title":1,
-        "every_score":[
-            3,
-            2,
-            1,
-            0
-        ],
-        "total_score":"3",
-        "index":0,
-        "score_height":25.118110236220474,
-        "score_width":110.82677165354332,
-        "score_dot":[
-            619.1732283464567,
-            379.34645669291336
-        ],
-        "page":1
-    },
-    {
-        "type":"answer",
-        "name":"3",
-        "num":1,
-        "score":"3",
-        "start":2,
-        "dot":[
-            46,
-            564.6535433070866
-        ],
-        "height":208.65354330708664,
-        "width":681,
-        "every_height":48,
-        "every_width":681,
-        "padding":0,
-        "show_title":0,
-        "every_score":[
-            3,
-            2,
-            1,
-            0
-        ],
-        "total_score":"3",
-        "index":1,
-        "score_height":25.118110236220474,
-        "score_width":110.82677165354332,
-        "score_dot":[
-            619.1732283464567,
-            608.7874015748032
-        ],
-        "page":1
-    }
-]
+sheet_json = [{"dot":[46,356],"every_height":15.118110236220472,"every_width":120.94488188976378,"height":111.496062992126,"name":"一、选择题","num":10,"padding":5.67,"page":1,"score":3,"score_dot":[688.38,271.95],"score_height":4,"score_width":9,"show_title":1,"start":1,"title_height":15.58,"type":"select","width":681,"total_score":30,"index":0},{"dot":[46,467.496062992126],"every_height":30.236220472440944,"every_width":681,"height":51.0236220472441,"name":"二、填空题","num":1,"padding":0,"page":1,"score":4,"score_dot":[645.6299212598425,490.84251968503935],"score_height":25.118110236220474,"score_width":84.37007874015748,"show_title":1,"start":11,"title_height":15.58,"type":"fill","width":681,"every_score":[4,3,0],"total_score":4,"index":1},{"dot":[46,518.5196850393701],"every_height":30.236220472440944,"every_width":681,"height":32.125984251968504,"name":"二、填空题","num":1,"padding":0,"page":1,"score":4,"score_dot":[645.6299212598425,522.9685039370079],"score_height":25.118110236220474,"score_width":84.37007874015748,"show_title":0,"start":12,"title_height":15.58,"type":"fill","width":681,"every_score":[4,2,0],"total_score":4,"index":2},{"dot":[46,550.6456692913385],"every_height":30.236220472440944,"every_width":681,"height":32.125984251968504,"name":"二、填空题","num":1,"padding":0,"page":1,"score":4,"score_dot":[672.0866141732283,555.0944881889764],"score_height":25.118110236220474,"score_width":57.91338582677166,"show_title":0,"start":13,"title_height":15.58,"type":"fill","width":681,"every_score":[4,0],"total_score":4,"index":3},{"dot":[46,582.771653543307],"every_height":30.236220472440944,"every_width":681,"height":32.125984251968504,"name":"二、填空题","num":1,"padding":0,"page":1,"score":4,"score_dot":[672.0866141732283,587.2204724409448],"score_height":25.118110236220474,"score_width":57.91338582677166,"show_title":0,"start":14,"title_height":15.58,"type":"fill","width":681,"every_score":[4,0],"total_score":4,"index":4},{"dot":[46,614.8976377952755],"every_height":30.236220472440944,"every_width":681,"height":32.125984251968504,"name":"二、填空题","num":1,"padding":0,"page":1,"score":4,"score_dot":[672.0866141732283,619.3464566929133],"score_height":25.118110236220474,"score_width":57.91338582677166,"show_title":0,"start":15,"title_height":15.58,"type":"fill","width":681,"every_score":[4,0],"total_score":4,"index":5},{"dot":[46,647.023622047244],"every_height":30.236220472440944,"every_width":681,"height":32.125984251968504,"name":"二、填空题","num":1,"padding":0,"page":1,"score":4,"score_dot":[672.0866141732283,651.4724409448818],"score_height":25.118110236220474,"score_width":57.91338582677166,"show_title":0,"start":16,"title_height":15.58,"type":"fill","width":681,"every_score":[4,0],"total_score":4,"index":6},{"dot":[46,679.1496062992125],"every_height":48,"every_width":681,"height":229.44094488188978,"name":"三、解答题","num":1,"padding":0,"page":1,"score":6,"score_dot":[539.8031496062993,702.4960629921259],"score_height":25.118110236220474,"score_width":190.1968503937008,"show_title":1,"start":17,"title_height":15.58,"type":"answer","width":681,"every_score":[6,5,4,3,2,1,0],"total_score":6,"index":7},{"dot":[46,75.59055118110237],"every_height":48,"every_width":681,"height":229.44094488188978,"name":"四、解答题","num":1,"padding":0,"page":2,"score":6,"score_dot":[539.8031496062993,98.93700787401576],"score_height":25.118110236220474,"score_width":190.1968503937008,"show_title":1,"start":18,"title_height":15.58,"type":"answer","width":681,"every_score":[6,5,4,3,2,1,0],"total_score":6,"index":8},{"dot":[46,305.0314960629921],"every_height":48,"every_width":681,"height":229.44094488188978,"name":"五、解答题","num":1,"padding":0,"page":2,"score":6,"score_dot":[539.8031496062993,328.3779527559055],"score_height":25.118110236220474,"score_width":190.1968503937008,"show_title":1,"start":19,"title_height":15.58,"type":"answer","width":681,"every_score":[6,5,4,3,2,1,0],"total_score":6,"index":9},{"dot":[46,534.4724409448819],"every_height":48,"every_width":681,"height":229.44094488188978,"name":"六、解答题","num":1,"padding":0,"page":2,"score":8,"score_dot":[486.8897637795276,557.8188976377953],"score_height":25.118110236220474,"score_width":243.11023622047244,"show_title":1,"start":20,"title_height":15.58,"type":"answer","width":681,"every_score":[8,7,6,5,4,3,2,1,0],"total_score":8,"index":10},{"dot":[46,763.9133858267717],"every_height":48,"every_width":681,"height":229.44094488188978,"name":"七、解答题","num":1,"padding":0,"page":2,"score":8,"score_dot":[486.8897637795276,787.2598425196851],"score_height":25.118110236220474,"score_width":243.11023622047244,"show_title":1,"start":21,"title_height":15.58,"type":"answer","width":681,"every_score":[8,7,6,5,4,3,2,1,0],"total_score":8,"index":11},{"dot":[46,75.59055118110237],"every_height":48,"every_width":681,"height":229.44094488188978,"name":"八、解答题","num":1,"padding":0,"page":3,"score":10,"score_dot":[407.5196850393701,98.93700787401576],"score_height":25.118110236220474,"score_width":322.4803149606299,"show_title":1,"start":22,"title_height":15.58,"type":"answer","width":681,"every_score":[1,"",9,8,7,6,5,4,3,2,1,0],"total_score":10,"index":12},{"dot":[46,305.0314960629921],"every_height":48,"every_width":681,"height":229.44094488188978,"name":"九、解答题","num":1,"padding":0,"page":3,"score":10,"score_dot":[407.5196850393701,328.3779527559055],"score_height":25.118110236220474,"score_width":322.4803149606299,"show_title":1,"start":23,"title_height":15.58,"type":"answer","width":681,"every_score":[1,"",9,8,7,6,5,4,3,2,1,0],"total_score":10,"index":13},{"dot":[46,534.4724409448819],"every_height":48,"every_width":681,"height":229.44094488188978,"name":"十、解答题","num":1,"padding":0,"page":3,"score":12,"score_dot":[407.5196850393701,557.8188976377953],"score_height":25.118110236220474,"score_width":322.4803149606299,"show_title":1,"start":24,"title_height":15.58,"type":"answer","width":681,"every_score":["1","",9,8,7,6,5,4,3,2,1,0],"total_score":12,"index":14}]
 
 def get_file():
     docunames = os.listdir(path)

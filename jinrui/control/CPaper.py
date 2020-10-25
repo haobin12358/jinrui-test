@@ -1,10 +1,5 @@
-from datetime import datetime
-
-from ..config.enums import TestEnum
-from ..extensions.success_response import Success
 from ..extensions.error_response import NoQuestion, UnknownQuestionType
 from ..extensions.params_validates import parameter_required
-from jinrui.extensions.register_ext import db
 from jinrui.models.jinrui import j_question, j_paper
 
 class CPaper():
@@ -48,7 +43,7 @@ class CPaper():
                         "score_height": 4,
                         "score_width": 9,
                         "score_dot": [688.38, 271.95],
-                        "show_title": True
+                        "show_title": 1
                     }
                     big_question_number = big_question_number + 1
                     start = int(question.question_number)
@@ -56,7 +51,6 @@ class CPaper():
                     select_dict["start"] = start
                 else:
                     select_dict["num"] = select_dict["num"] + 1
-                    select_dict["score"] = select_dict["score"] + question.score
 
             elif question.type == "多选题":
                 now_question_type = self._get_question_en(question.type)
@@ -80,11 +74,10 @@ class CPaper():
                         "score_height": 4,
                         "score_width": 9,
                         "score_dot": [688.38, 271.95],
-                        "show_title": True
+                        "show_title": 1
                     }
                 else:
                     select_dict["num"] = select_dict["num"] + 1
-                    select_dict["score"] = select_dict["score"] + question.score
 
             elif question.type == "判断题":
                 now_question_type = self._get_question_en(question.type)
@@ -108,11 +101,10 @@ class CPaper():
                         "score_height": 4,
                         "score_width": 9,
                         "score_dot": [688.38, 271.95],
-                        "show_title": True
+                        "show_title": 1
                     }
                 else:
                     select_dict["num"] = select_dict["num"] + 1
-                    select_dict["score"] = select_dict["score"] + question.score
 
             elif question.type == "填空题":
                 now_question_type = self._get_question_en(question.type)
@@ -137,7 +129,7 @@ class CPaper():
                         "score_height": 4,
                         "score_width": 9,
                         "score_dot": [688.38, 271.95],
-                        "show_title": True
+                        "show_title": 1
                     }
                     response.append(select_dict)
                 else:
@@ -158,7 +150,7 @@ class CPaper():
                         "score_height": 4,
                         "score_width": 9,
                         "score_dot": [688.38, 271.95],
-                        "show_title": False
+                        "show_title": 0
                     }
                     response.append(select_dict)
 
@@ -184,7 +176,7 @@ class CPaper():
                     "score_height": 4,
                     "score_width": 9,
                     "score_dot": [688.38, 271.95],
-                    "show_title": True
+                    "show_title": 1
                 }
                 response.append(select_dict)
 
