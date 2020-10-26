@@ -1,5 +1,4 @@
-import os, cv2
-import fitz
+import os, cv2, fitz
 
 pdf_dir = []
 
@@ -63,6 +62,7 @@ def label2picture(cropImg, framenum, tracker):
     else:
         os.makedirs(pathnew + tracker)
         cv2.imwrite(pathnew + tracker + '\\' + framenum + '.jpg', cropImg, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+
 # 剪裁sn
 def cut_sn():
     for jpg in jpg_dir:
