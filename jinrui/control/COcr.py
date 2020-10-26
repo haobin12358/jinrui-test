@@ -1,5 +1,5 @@
 # import sheet
-import os, uuid, oss2, shutil
+import os, uuid, oss2, shutil, json, cv2, fitz, platform
 from datetime import datetime
 
 from ..config.enums import TestEnum
@@ -7,10 +7,16 @@ from ..extensions.success_response import Success
 from jinrui.config.secret import ACCESS_KEY_SECRET, ACCESS_KEY_ID, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME
 from jinrui.extensions.register_ext import db
 from ..extensions.params_validates import parameter_required
-from jinrui.models.jinrui import j_question
+from jinrui.models.jinrui import j_question, j_answer_pdf
 from flask import current_app
 
 class COcr():
+
+    def __init__(self):
+        self.index_h = 1684 / 1124.52
+        self.index_w = 1191 / 810.81
+        self.width_less = 4
+        self.height_less = -30
 
     def mock_ocr_response(self):
         args = parameter_required(("image_url", "image_type"))
@@ -38,6 +44,277 @@ class COcr():
 
         shutil.rmtree(pic_path)
         return Success(data=data)
+
+    def deal_pdf(self):
+        pdf = j_answer_pdf.query.filter(j_answer_pdf.isdelete == 0, j_answer_pdf.pdf_status == "300301")\
+            .order_by(j_answer_pdf.createtime.desc()).first()
+        pdf_url = pdf.pdf_url
+        sheet_dict = json.loads(pdf.sheet_dict)
+
+        pdf_uuid = str(uuid.uuid1())
+        # 创建pdf存储路径
+        if platform.system() == "Windows":
+            pdf_path = "D:\\jinrui_pdf\\" + pdf_uuid + "\\"
+        else:
+            pdf_path = "/tmp/jinrui_pdf/" + pdf_uuid + "/"
+        if not os.path.exists(pdf_path):
+            os.makedirs(pdf_path)
+
+        auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
+        bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
+
+        pdf_name = pdf_url.split("/")
+        pdf_save_path = pdf_path + pdf_name[-1]
+        # 存储pdf到本地
+        bucket.get_object_to_file(pdf_name[-1], pdf_save_path)
+
+    def _conver_img(self, pdf_path):
+        """
+        将pdf转化为jpg
+        """
+        doc = fitz.Document(pdf_path)
+        pdf_name = os.path.splitext(pdf)[0]
+        i = 1
+        for pg in range(doc.pageCount):
+            page = doc[pg]
+            rotate = int(0)
+            # 每个尺寸的缩放系数为2，这将为我们生成分辨率提高四倍的图像。
+            zoom_x = 2.0
+            zoom_y = 2.0
+            trans = fitz.Matrix(zoom_x, zoom_y).preRotate(rotate)
+            pm = page.getPixmap(matrix=trans, alpha=False)
+            pm.writePNG(path + '\\{0}.jpg'.format(pdf_name + "-" + str(i)))
+            i = i + 1
+
+    def _label2picture(self, path, cropImg, framenum, tracker):
+        """
+        存储图片
+        path: 图片存储前缀
+        cropImg: 图片
+        framenum: 文件名
+        tracker: 存储文件夹
+        """
+        pathnew = path + "\\"
+
+        if (os.path.exists(pathnew + tracker)):
+            current_app.logger.info(">>>>>>>>>>>>>>>>>" + framenum)
+            cv2.imwrite(pathnew + tracker + '\\' + framenum + '.jpg', cropImg, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+
+        else:
+            os.makedirs(pathnew + tracker)
+            cv2.imwrite(pathnew + tracker + '\\' + framenum + '.jpg', cropImg, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+
+    def _cut_sn(self, path, jpg_dir):
+        """
+        剪切sn号
+        """
+        for jpg in jpg_dir:
+            jpg_name_dict = jpg.replace(".jpg", "").split("-")
+            if int(jpg_name_dict[1]) % 4 == 1:
+                img = cv2.imread(r"{0}".format(path + "\\" + jpg))
+                sn_w = 600 + self.width_less
+                sn_y = 40 + self.height_less
+                sn_height = 16
+                sn_width = 115
+                print(int(sn_y * self.index_h))
+                print(int(sn_w * self.index_w))
+                crop_img = img[int(sn_y * self.index_h): int((sn_y + sn_height) * self.index_h),
+                           int(sn_w * self.index_w): int((sn_w + sn_width) * self.index_w)]
+                self._label2picture(path, crop_img, "sn-{0}".format(str(int(int(jpg_name_dict[1]) / 4))), jpg_name_dict[0])
+
+    def _cut_select(self, path, name_dir, sheet_json):
+        """
+        剪切单选
+        """
+        for sheet in sheet_json:
+            if sheet["type"] == "select":
+                page = sheet["page"]
+                for name in name_dir:
+                    i = 0
+                    jpg_name = name + "-" + str(i + page) + ".jpg"
+                    while jpg_name in jpg_dir:
+                        select_x = sheet["dot"][0]
+                        select_y = sheet["dot"][1]
+                        img = cv2.imread(path + "\\" + jpg_name)
+                        j = 0
+                        while j < sheet["num"]:
+                            up = 26.37 + (j % 5) * sheet["every_height"] + height_less
+                            left = (int(j / 5)) * sheet["every_width"] + width_less
+                            print(int((select_y + up) * index_h))
+                            print(int((select_x + left) * index_w))
+                            crop_img = img[int((select_y + up) * index_h): int(
+                                (select_y + sheet["every_height"] + up) * index_h),
+                                       int((select_x + left) * index_w): int(
+                                           (select_x + left + sheet["every_width"]) * index_w)]
+                            label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"], str(int(i / 4)),
+                                                                             str(sheet["index"] + 1), str(j + 1)),
+                                          name)
+                            j = j + 1
+
+                        i = i + 4
+                        jpg_name = name + "-" + str(i + page) + ".jpg"
+
+    # 剪裁多选
+    def _cut_multi(self):
+        """
+        剪裁多选
+        """
+        for sheet in sheet_json:
+            if sheet["type"] == "multi":
+                page = sheet["page"]
+                for name in name_dir:
+                    i = 0
+                    jpg_name = name + "-" + str(i + page) + ".jpg"
+                    while jpg_name in jpg_dir:
+                        select_x = sheet["dot"][0]
+                        select_y = sheet["dot"][1]
+                        img = cv2.imread(path + "\\" + jpg_name)
+                        j = 0
+                        while j < sheet["num"]:
+                            up = 26.37 + (j % 5) * sheet["every_height"] + height_less
+                            left = (int(j / 5)) * sheet["every_width"] + width_less
+                            print(int((select_y + up) * index_h))
+                            print(int((select_x + left) * index_w))
+                            crop_img = img[int((select_y + up) * index_h): int(
+                                (select_y + sheet["every_height"] + up) * index_h),
+                                       int((select_x + left) * index_w): int(
+                                           (select_x + left + sheet["every_width"]) * index_w)]
+                            label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"], str(int(i / 4)),
+                                                                             str(sheet["index"] + 1), str(j + 1)),
+                                          name)
+                            j = j + 1
+
+                        i = i + 4
+                        jpg_name = name + "-" + str(i + page) + ".jpg"
+
+    def _cut_judge(self):
+        """
+        剪裁判断
+        """
+        for sheet in sheet_json:
+            if sheet["type"] == "judge":
+                page = sheet["page"]
+                for name in name_dir:
+                    i = 0
+                    jpg_name = name + "-" + str(i + page) + ".jpg"
+                    while jpg_name in jpg_dir:
+                        select_x = sheet["dot"][0]
+                        select_y = sheet["dot"][1]
+                        img = cv2.imread(path + "\\" + jpg_name)
+                        j = 0
+                        while j < sheet["num"]:
+                            up = 26.37 + (j % 5) * sheet["every_height"] + height_less
+                            left = (int(j / 5)) * sheet["every_width"] + width_less
+                            print(int((select_y + up) * index_h))
+                            print(int((select_x + left) * index_w))
+                            crop_img = img[int((select_y + up) * index_h): int(
+                                (select_y + sheet["every_height"] + up) * index_h),
+                                       int((select_x + left) * index_w): int(
+                                           (select_x + left + sheet["every_width"]) * index_w)]
+                            label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"], str(int(i / 4)),
+                                                                             str(sheet["index"] + 1), str(j + 1)),
+                                          name)
+                            j = j + 1
+
+                        i = i + 4
+                        jpg_name = name + "-" + str(i + page) + ".jpg"
+
+    def cut_fill_all(self):
+        """
+        全量剪裁填空
+        """
+        for sheet in sheet_json:
+            if sheet["type"] == "fill":
+                page = sheet["page"]
+                for name in name_dir:
+                    i = 0
+                    jpg_name = name + "-" + str(i + page) + ".jpg"
+                    while jpg_name in jpg_dir:
+                        select_x = sheet["dot"][0] + width_less
+                        select_y = sheet["dot"][1] + height_less
+                        img = cv2.imread(path + "\\" + jpg_name)
+                        crop_img = img[int(select_y * index_h): int(
+                            (select_y + sheet["height"]) * index_h),
+                                   int(select_x * index_w): int(
+                                       (select_x + sheet["width"]) * index_w)]
+                        label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"] + "all", str(int(i / 4)),
+                                                                         str(sheet["index"] + 1), str(1)), name)
+
+                        i = i + 4
+                        jpg_name = name + "-" + str(i + page) + ".jpg"
+
+    def _cut_fill_ocr(self):
+        """
+        剪裁填空题ocr识别区域
+        """
+        for sheet in sheet_json:
+            if sheet["type"] == "fill":
+                page = sheet["page"]
+                for name in name_dir:
+                    i = 0
+                    jpg_name = name + "-" + str(i + page) + ".jpg"
+                    while jpg_name in jpg_dir:
+                        select_x = sheet["score_dot"][0] + width_less
+                        select_y = sheet["score_dot"][1] + height_less
+                        img = cv2.imread(path + "\\" + jpg_name)
+                        crop_img = img[int(select_y * index_h): int(
+                            (select_y + sheet["score_height"]) * index_h),
+                                   int(select_x * index_w): int(
+                                       (select_x + sheet["score_width"]) * index_w)]
+                        label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"] + "ocr", str(int(i / 4)),
+                                                                         str(sheet["index"] + 1), str(1)), name)
+
+                        i = i + 4
+                        jpg_name = name + "-" + str(i + page) + ".jpg"
+
+    def _cut_answer_all(self):
+        """
+        全量剪裁简答题
+        """
+        for sheet in sheet_json:
+            if sheet["type"] == "answer":
+                page = sheet["page"]
+                for name in name_dir:
+                    i = 0
+                    jpg_name = name + "-" + str(i + page) + ".jpg"
+                    while jpg_name in jpg_dir:
+                        select_x = sheet["dot"][0] + width_less
+                        select_y = sheet["dot"][1] + height_less
+                        img = cv2.imread(path + "\\" + jpg_name)
+                        crop_img = img[int(select_y * index_h): int(
+                            (select_y + sheet["height"]) * index_h),
+                                   int(select_x * index_w): int(
+                                       (select_x + sheet["width"]) * index_w)]
+                        label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"] + "all", str(int(i / 4)),
+                                                                         str(sheet["index"] + 1), str(1)), name)
+
+                        i = i + 4
+                        jpg_name = name + "-" + str(i + page) + ".jpg"
+
+    def _cut_answer_ocr(self):
+        """
+        剪裁简答题ocr识别区域
+        """
+        for sheet in sheet_json:
+            if sheet["type"] == "answer":
+                page = sheet["page"]
+                for name in name_dir:
+                    i = 0
+                    jpg_name = name + "-" + str(i + page) + ".jpg"
+                    while jpg_name in jpg_dir:
+                        select_x = sheet["score_dot"][0] + width_less
+                        select_y = sheet["score_dot"][1] + height_less
+                        img = cv2.imread(path + "\\" + jpg_name)
+                        crop_img = img[int(select_y * index_h): int(
+                            (select_y + sheet["score_height"]) * index_h),
+                                   int(select_x * index_w): int(
+                                       (select_x + sheet["score_width"]) * index_w)]
+                        label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"] + "ocr", str(int(i / 4)),
+                                                                         str(sheet["index"] + 1), str(1)), name)
+
+                        i = i + 4
+                        jpg_name = name + "-" + str(i + page) + ".jpg"
+
 
     def mock_question(self):
         test_json = {'1': "<div>1．【实数的有关概念与大小比较】下列各数中最大的是()</div><div>A．2－<img src='https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image1_5882773743013888.png'></img>B．1C.<img src='https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image1_5882773743013888.png'></img>－2D．3－<img src='https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image1_5882773743013888.png'></img></div>", '2': '<div>2．【整式的运算】下列算式正确的是()</div><div>A．x<sup>5</sup>＋x<sup>5</sup>＝x<sup>10</sup>  B．(a－b)<sup>7</sup>÷(a－b)<sup>3</sup>＝a<sup>4</sup>－b<sup>4</sup></div><div>C．(－x<sup>5</sup>)<sup>5</sup>＝－x<sup>25</sup>  D．(－x)<sup>5</sup>(－x)<sup>5</sup>＝－x<sup>10</sup></div><div><a:blip r:embed="rId7" cstate="print"></div><div>图1</div>', '3': '<div>3．【相交线与平行线】如图1，直线a∥b，直线c分别交a，b于点A，C，∠BAC的平分线交直线b于点D，若∠2＝50°，则∠1的度数是()</div><div>A．50°      B．60°        C．80°      D．100°</div>', '4': "<div>4．【分式的概念】若分式<img src='https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image3_5882775005499392.png'></img>的值为0，则x的值为()</div><div>A．0              B．2</div><div>C．－2          D．2或－2</div>", '5': '<div>5．【三视图】图2①是矗立千年而不倒的应县木塔一角，它使用了六十多种形态各异的斗栱．斗栱是中国古代匠师们为减少立柱与横梁交接处的剪力而创造的一种独特的结构，位于柱与梁之间，斗栱是由斗、升、栱、翘、昂组成，图②是其中一个组成部件的三视图，则这个部件是()</div><div><a:blip r:embed="rId9" cstate="print"></div><div>图2</div><div><a:blip r:embed="rId10" cstate="print">   <a:blip r:embed="rId11" cstate="print">     <a:blip r:embed="rId12" cstate="print">      <a:blip r:embed="rId13" cstate="print"></div><div>   A       B        C     D</div>', '6': '<div>6．【概率的计算】七巧板是我国古代劳动人民的发明之一，被誉为“东方魔板”，它是由五块等腰直角三角形、一块正方形和一块平行四边形共七块板组成的．如图3是一个用七巧板拼成的正方形，如果在此正方形中随机取一点，那么此点取自黑色部分的概率为()</div><div>A.<img src=\'https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image9_5882778625183744.png\'></img>         B.<img src=\'https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image10_5882777731796992.png\'></img>       C.<img src=\'https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image11_5882776809050112.png\'></img>         D.<img src=\'https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image12_5882775924051968.png\'></img></div><div><a:blip r:embed="rId18" cstate="print">        <a:blip r:embed="rId19" cstate="print">       <a:blip r:embed="rId20" cstate="print"></div><div>图3           图4       图5</div>', '7': "<div>7．【平面直角坐标系】如图4，在平面直角坐标系中，设点P到原点O的距离为ρ，OP与x轴正方向的夹角为α，则用[ρ，α]表示点P的极坐标，例如：点P的坐标为(1，1)，则其极坐标为[<img src='https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image16_5882779489210368.png'></img>，45°]．若点Q的极坐标为[4，120°]，则点Q的平面坐标为()</div><div>A．(－2，2<img src='https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image17_5882780340654080.png'></img>)     B．(2，－2<img src='https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image17_5882780340654080.png'></img>)  </div><div>C．(－2<img src='https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image17_5882781234040832.png'></img>，－2)     D．(－4，－4<img src='https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image17_5882781234040832.png'></img>)</div>", '8': '<div>8．【解直角三角形的应用】如图5，学校大门出口处有一自动感应栏杆，点A是栏杆转动的支点，当车辆经过时，栏杆AE会自动升起，某天早上，栏杆发生故障，在某个位置突然卡住，这时测得栏杆升起的角度∠BAE＝127°，已知AB⊥BC，支架AB高1.2米，大门BC打开的宽度为2米，以下哪辆车可以通过？(栏杆宽度，汽车反光镜忽略不计)</div><div>(参考数据：sin37°≈0.60，cos37°≈0.80，tan37°≈0.75.车辆尺寸：长×宽×高)()</div><div>A．宝马Z4(4 200 mm×1 800 mm×1 360 mm) </div><div>B．奇瑞QQ(4 000 mm×1 600 mm×1 520 mm)</div><div>C．大众朗逸(4 600 mm×1 700 mm×1 400 mm) </div><div>D．奥迪A4(4 700 mm×1 800 mm×1 400 mm)</div>', '9': '<div>9．【图形变换】 如图6，在平行四边形ABCD中，BC＝4，现将平行四边形ABCD绕点A旋转到平行四边形AEFG的位置，其中点B，C，D分别落在点E，F，G处，且点B，E，D，F在同一直线上，如果点E恰好是对角线BD的中点，那么AB的长度是()</div><div>A．4        B．3         C．2<img src=\'https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image16_5882782102261760.png\'></img>         D.<img src=\'https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image18_5882782991454208.png\'></img></div><div><a:blip r:embed="rId24" cstate="print">      <a:blip r:embed="rId25" cstate="print"></div><div>图6              图7</div>', '10': '<div>10．【函数的图象】如图7①，一个立方体铁块放置在圆柱形水槽内，现以每秒固定的流量往水槽中注水，28 s时注满水槽，水槽内水面的高度y(cm)与注水时间x(s)之间的函数图象如图②所示，则圆柱形水槽的容积(在没放铁块的情况下)是()</div><div>A．8 000 cm<sup>3</sup> B．10 000 cm<sup>3</sup>  C．2 000π cm<sup>3</sup>  D．3 000π cm<sup>3</sup></div><div></div>', '11': '<div>11．【整式的运算】如图8所示，图①是一个边长为a的正方形剪去一个边长为1的小正方形，图②是一个边长为(a－1)的正方形．记图①，图②中阴影部分的面积分别为S<sub>1</sub>，S<sub>2</sub>，则<img src=\'https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image21_5882783847092224.png\'></img>可化简为________．</div><div><a:blip r:embed="rId27" cstate="print">        <a:blip r:embed="rId28" cstate="print"></div><div> 图8                 图9</div><div><a:blip r:embed="rId29" cstate="print"></div><div>图10</div>', '12': '<div>12．【全等三角形的判定】如图9，在△ABC和△BAD中，BC＝AD，请你再补充一个条件，使△ABC≌△BAD.你补充的条件是________(只填一个)．</div>', '13': '<div>13．【平均数，中位数与众数】 如图10是根据媒体提供的消息绘制的“某市各大报刊发行量统计图”，那么发行量的众数是________万份．</div>', '14': "<div>14．【整式的运算】我们知道，同底数幂的乘法法则为a<sup>m</sup>·a<sup>n</sup>＝a<sup>m</sup><sup>＋</sup><sup>n</sup>(其中a≠0，m，n为正整数)，类似地我们规定关于任意正整数m，n的一种新运算：h(m＋n)＝h(m)·h(n)，请根据这种新运算填空：</div><div>(1)若h(1)＝<img src='https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image25_5882784736284672.png'></img>，则h(2)＝________；</div><div>(2)若h(1)＝k(k≠0)，那么h(n)·h(2 020)＝________(用含n和k的代数式表示，其中n为正整数)．</div>", '15': '<div>15．【一次函数的应用】在一条笔直的公路上有A，B两地，甲、乙两人同时出发，甲骑自行车从A地到B地，中途出现故障后停车修理，修好车后以原速继续行驶到B地；乙骑电动车从B地到A地，到达A地后立即按原路原速返回，结果两人同时到B地．如图11是甲、乙两人与A地的距离y(km)与行驶时间x(h)之间的函数图象．当甲距离B地还有5 km时，此时乙距B地还有________km.</div><div><a:blip r:embed="rId31" cstate="print">    <a:blip r:embed="rId32" cstate="print"></div><div>     图11              图12</div>', '16': '<div>16．【弧长计算】如图12，正方形ABCD的边长为1，分别以顶点A，B，C，D为圆心，1为半径画弧，四条弧交于点E，F，G，H，则图中阴影部分的外围周长为________．</div><div></div>', '17': "<div>17．【实数的运算】(6分)计算：<img src='https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image28_5882787319975936.png'></img><img src='https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image29_5882786485309440.png'></img>－|<img src='https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image17_5882788158836736.png'></img>－2|＋(<img src='https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image17_5882788158836736.png'></img>－3)<sup>0</sup>－<img src='https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image16_5882785638060032.png'></img>cos45°.</div><div></div><div></div><div></div><div></div><div></div>", '18': "<div>18．【解不等式组】(6分)解不等式组<img src='https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image30_5882789006086144.png'></img>并把它的解集表示在数轴上．</div><div></div><div></div><div></div><div></div>", '19': '<div>19．【统计与概率】(6分)为关注学生出行安全，调查了某班学生出行方式，调查结果分为四类：A－骑自行车，B－步行，C－坐社区巴士，D－其他，并将调査结果绘制成如图13所示的两幅不完整的统计图．</div><div>请你根据统计图，解答下列问题：</div><div>(1)本次一共调査了多少名学生？</div><div>(2)C类女生有________名，D类男生有________名，并将条形统计图补充完整；</div><div>(3)若从被调查的A类和D类学生中分别随机选取一位同学进行进一步调查，请用列表法或画树状图的方法求出所选同学中恰好是一位男同学和一位女同学的概率．</div><div><a:blip r:embed="rId36" cstate="print"></div><div>图13</div><div></div><div></div><div></div><div></div><div></div>', '20': '<div>20．【网格作图】(8分)在所给的5×5方格中，每个小正方形的边长都是1.按要求画平行四边形：</div><div>(1)在图14①中，画出一个平行四边形，使其有一个内角为45°且它的四个顶点在方格的顶点上；</div><div>(2)在图②中，画出一个平行四边形(非特殊的平行四边形)，使其周长为整数且它的四个顶点在方格的顶点上；</div><div>(3)在图③中，画出一个平行四边形，使其面积为6且它的四个顶点以及对角线交点都在方格的顶点上．</div><div><a:blip r:embed="rId37" cstate="print"></div><div>图14</div><div></div><div></div>', '21': '<div>21．【圆的切线】(8分)如图15，在△ABC中，E是AC边上的一点，且AE＝AB，∠BAC＝2∠CBE，以AB为直径作⊙O交AC于点D，交BE于点F.</div><div><a:blip r:embed="rId38" cstate="print"></div><div>图15</div><div>(1)求证：EF＝BF；</div><div>(2)求证：BC是⊙O的切线；</div><div>(3)若AB＝4，BC＝3，求DE的长．</div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>', '22': '<div>22．【二次函数的综合】(10分)如图16所示，二次函数y＝ax<sup>2</sup>＋bx＋2的图象经过点A(4，0)，B(－4，－4)，且与y轴交于点C.</div><div>(1)请求出二次函数的表达式；</div><div>(2)若点M(m，n)在抛物线的对称轴上，且AM平分∠OAC，求n的值；</div><div>(3)若P是线段AB上的一个动点(不与A，B重合)，过P作PQ∥AC，与AB上方的抛物线交于点Q，与x轴交于点H，试问：是否存在这样的点Q，使PH＝2QH？若存在，请直接出点Q的坐标；若不存在，请说明理由．</div><div><a:blip r:embed="rId39" cstate="print"></div><div>图16</div><div></div><div></div><div></div><div></div><div></div>', '23': '<div>23．【阅读理解，反比例函数的综合】(10分)小韦同学十分崇拜科学家，立志成为有所发现、有所创造的人，他组建了三人探究小组，探究小组对以下问题有了发现：</div><div>如图17①，已知一次函数y＝x＋1的图象分别与x轴和y轴相交于点E，F.过一次函数y＝x＋1的图象上的动点P作PB⊥x轴，垂足是B，直线BP交反比例函数y＝－<img src=\'https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/image35_5882789895278592.png\'></img>的图象于点Q.过点Q作QC⊥y轴，垂足是C，直线QC交一次函数y＝x＋1的图象于点A.当点P与点E重合时(如图②)，∠POA的度数是一个确定的值．</div><div>请你加入该小组，继续探究：</div><div>(1)当点P与点E重合时，∠POA＝________°；</div><div>(2)当点P不与点E重合时，(1)中的结论还成立吗？如果成立，请说明理由；如果不成立，请说明理由并求出∠POA的度数．</div><div><a:blip r:embed="rId41" cstate="print"></div><div>图17</div><div></div><div></div><div></div><div></div><div></div>', '24': '<div>24．【几何综合】(12分)综合与实践－－探究图形中角之间的等量关系及相关问题．</div><div>问题情境：</div><div>正方形ABCD中，点P是射线DB上的一个动点，过点C作CE⊥AP于点E，点Q与点P关于点E对称，连结CQ，设∠DAP＝α(0°＜α＜135°)，∠QCE＝β.</div><div>初步探究：</div><div><a:blip r:embed="rId42" cstate="print"></div><div>图18</div><div></div><div></div><div></div><div></div><div></div><div>(1)如图18①，为探究α与β的关系，勤思小组的同学画出了0°＜α＜45°时的情形，射线AP与边CD交于点F.他们得出此时α与β的关系是β＝2α.借助这一结论可得当点Q恰好落在线段BC的延长线上(如图②)时，α＝________°，β＝________°.</div><div>深入探究：</div><div>(2)敏学小组的同学画出45°＜α＜90°时的图形如图③，射线AP与边BC交于点G.请猜想此时α与β之间的等量关系，并证明结论．</div><div>拓展延伸：</div><div>(3)请你借助图④进一步探究：①当90°＜α＜135°时，α与β之间的等量关系为________；</div><div>②已知正方形边长为2，在点P运动过程中，当α＝β时，PQ的长为________．</div><div></div><div></div><div></div>'}
