@@ -125,7 +125,7 @@ class j_answer_pdf(Base):
     pdf_use = Column(String(10), nullable=False, comment="300201先批后扫300202先扫后批")
     paper_name = Column(String(255), nullable=False, comment="试卷名")
     sheet_dict = Column(Text, comment="答题卡json")
-    pdf_status = Column(String(10), comment="300301未解析300302已解析300303解析失败")
+    pdf_status = Column(String(10), comment="300301未解析300302已解析300303解析失败300304解析中")
     pdf_url = Column(String(255), comment="pdf地址")
     pdf_address = Column(Text, comment="pdf原始地址")
 

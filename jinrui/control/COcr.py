@@ -66,14 +66,42 @@ class COcr():
         pdf_name = pdf_url.split("/")
         pdf_save_path = pdf_path + pdf_name[-1]
         # 存储pdf到本地
-        bucket.get_object_to_file(pdf_name[-1], pdf_save_path)
+        result = bucket.get_object_to_file(pdf_name[-1], pdf_save_path)
 
-    def _conver_img(self, pdf_path):
+        if result.status != 200:
+            with db.auto_commit():
+                pdf_use = j_answer_pdf.query.filter(j_answer_pdf.pdf_id == pdf.pdf_id).first()
+                pdf_instance = pdf_use.update({
+                    "pdf_status": "300303"
+                })
+                db.session.add(pdf_instance)
+        else:
+            with db.auto_commit():
+                pdf_use = j_answer_pdf.query.filter(j_answer_pdf.pdf_id == pdf.pdf_id).first()
+                pdf_instance = pdf_use.update({
+                    "pdf_status": "300304"
+                })
+                db.session.add(pdf_instance)
+
+            jpg_dir = self._conver_img(pdf_path, pdf_save_path)
+
+            shutil.rmtree(pdf_path)
+
+            return jpg_dir
+
+    def _cut_pic_use_ocr(self):
+        """
+        1.判断jpg_dir长度
+        2.jpg_dir数组切片
+        3.jpg_
+        """
+
+
+    def _conver_img(self, pdf_path, pdf_save_path):
         """
         将pdf转化为jpg
         """
-        doc = fitz.Document(pdf_path)
-        pdf_name = os.path.splitext(pdf_path)[0]
+        doc = fitz.Document(pdf_save_path)
         i = 1
         for pg in range(doc.pageCount):
             page = doc[pg]
@@ -83,8 +111,16 @@ class COcr():
             zoom_y = 2.0
             trans = fitz.Matrix(zoom_x, zoom_y).preRotate(rotate)
             pm = page.getPixmap(matrix=trans, alpha=False)
-            pm.writePNG(pdf_path + '\\{0}.jpg'.format(pdf_name + "-" + str(i)))
+            pm.writePNG(pdf_path + '\\{0}.jpg'.format("%04d" % i))
             i = i + 1
+
+        jpg_dir = []
+        documents = os.listdir(pdf_path)
+        for document in documents:
+            if os.path.splitext(document)[1] == ".jpg":
+                jpg_dir.append(document)
+
+        return jpg_dir
 
     def _label2picture(self, path, cropImg, framenum, tracker):
         """
