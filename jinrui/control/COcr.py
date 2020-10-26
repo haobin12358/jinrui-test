@@ -73,7 +73,7 @@ class COcr():
         将pdf转化为jpg
         """
         doc = fitz.Document(pdf_path)
-        pdf_name = os.path.splitext(pdf)[0]
+        pdf_name = os.path.splitext(pdf_path)[0]
         i = 1
         for pg in range(doc.pageCount):
             page = doc[pg]
@@ -83,7 +83,7 @@ class COcr():
             zoom_y = 2.0
             trans = fitz.Matrix(zoom_x, zoom_y).preRotate(rotate)
             pm = page.getPixmap(matrix=trans, alpha=False)
-            pm.writePNG(path + '\\{0}.jpg'.format(pdf_name + "-" + str(i)))
+            pm.writePNG(pdf_path + '\\{0}.jpg'.format(pdf_name + "-" + str(i)))
             i = i + 1
 
     def _label2picture(self, path, cropImg, framenum, tracker):
@@ -122,7 +122,7 @@ class COcr():
                            int(sn_w * self.index_w): int((sn_w + sn_width) * self.index_w)]
                 self._label2picture(path, crop_img, "sn-{0}".format(str(int(int(jpg_name_dict[1]) / 4))), jpg_name_dict[0])
 
-    def _cut_select(self, path, name_dir, sheet_json):
+    def _cut_select(self, path, name_dir, sheet_json, jpg_dir):
         """
         剪切单选
         """
@@ -138,15 +138,15 @@ class COcr():
                         img = cv2.imread(path + "\\" + jpg_name)
                         j = 0
                         while j < sheet["num"]:
-                            up = 26.37 + (j % 5) * sheet["every_height"] + height_less
-                            left = (int(j / 5)) * sheet["every_width"] + width_less
-                            print(int((select_y + up) * index_h))
-                            print(int((select_x + left) * index_w))
-                            crop_img = img[int((select_y + up) * index_h): int(
-                                (select_y + sheet["every_height"] + up) * index_h),
-                                       int((select_x + left) * index_w): int(
-                                           (select_x + left + sheet["every_width"]) * index_w)]
-                            label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"], str(int(i / 4)),
+                            up = 26.37 + (j % 5) * sheet["every_height"] + self.height_less
+                            left = (int(j / 5)) * sheet["every_width"] + self.width_less
+                            print(int((select_y + up) * self.index_h))
+                            print(int((select_x + left) * self.index_w))
+                            crop_img = img[int((select_y + up) * self.index_h): int(
+                                (select_y + sheet["every_height"] + up) * self.index_h),
+                                       int((select_x + left) * self.index_w): int(
+                                           (select_x + left + sheet["every_width"]) * self.index_w)]
+                            self._label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"], str(int(i / 4)),
                                                                              str(sheet["index"] + 1), str(j + 1)),
                                           name)
                             j = j + 1
@@ -155,7 +155,7 @@ class COcr():
                         jpg_name = name + "-" + str(i + page) + ".jpg"
 
     # 剪裁多选
-    def _cut_multi(self):
+    def _cut_multi(self, sheet_json, name_dir, jpg_dir, path):
         """
         剪裁多选
         """
@@ -171,15 +171,15 @@ class COcr():
                         img = cv2.imread(path + "\\" + jpg_name)
                         j = 0
                         while j < sheet["num"]:
-                            up = 26.37 + (j % 5) * sheet["every_height"] + height_less
-                            left = (int(j / 5)) * sheet["every_width"] + width_less
-                            print(int((select_y + up) * index_h))
-                            print(int((select_x + left) * index_w))
-                            crop_img = img[int((select_y + up) * index_h): int(
-                                (select_y + sheet["every_height"] + up) * index_h),
-                                       int((select_x + left) * index_w): int(
-                                           (select_x + left + sheet["every_width"]) * index_w)]
-                            label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"], str(int(i / 4)),
+                            up = 26.37 + (j % 5) * sheet["every_height"] + self.height_less
+                            left = (int(j / 5)) * sheet["every_width"] + self.width_less
+                            print(int((select_y + up) * self.index_h))
+                            print(int((select_x + left) * self.index_w))
+                            crop_img = img[int((select_y + up) * self.index_h): int(
+                                (select_y + sheet["every_height"] + up) * self.index_h),
+                                       int((select_x + left) * self.index_w): int(
+                                           (select_x + left + sheet["every_width"]) * self.index_w)]
+                            self._label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"], str(int(i / 4)),
                                                                              str(sheet["index"] + 1), str(j + 1)),
                                           name)
                             j = j + 1
@@ -187,7 +187,7 @@ class COcr():
                         i = i + 4
                         jpg_name = name + "-" + str(i + page) + ".jpg"
 
-    def _cut_judge(self):
+    def _cut_judge(self, sheet_json, name_dir, jpg_dir, path):
         """
         剪裁判断
         """
@@ -203,15 +203,15 @@ class COcr():
                         img = cv2.imread(path + "\\" + jpg_name)
                         j = 0
                         while j < sheet["num"]:
-                            up = 26.37 + (j % 5) * sheet["every_height"] + height_less
-                            left = (int(j / 5)) * sheet["every_width"] + width_less
-                            print(int((select_y + up) * index_h))
-                            print(int((select_x + left) * index_w))
-                            crop_img = img[int((select_y + up) * index_h): int(
-                                (select_y + sheet["every_height"] + up) * index_h),
-                                       int((select_x + left) * index_w): int(
-                                           (select_x + left + sheet["every_width"]) * index_w)]
-                            label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"], str(int(i / 4)),
+                            up = 26.37 + (j % 5) * sheet["every_height"] + self.height_less
+                            left = (int(j / 5)) * sheet["every_width"] + self.width_less
+                            print(int((select_y + up) * self.index_h))
+                            print(int((select_x + left) * self.index_w))
+                            crop_img = img[int((select_y + up) * self.index_h): int(
+                                (select_y + sheet["every_height"] + up) * self.index_h),
+                                       int((select_x + left) * self.index_w): int(
+                                           (select_x + left + sheet["every_width"]) * self.index_w)]
+                            self._label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"], str(int(i / 4)),
                                                                              str(sheet["index"] + 1), str(j + 1)),
                                           name)
                             j = j + 1
@@ -219,7 +219,7 @@ class COcr():
                         i = i + 4
                         jpg_name = name + "-" + str(i + page) + ".jpg"
 
-    def cut_fill_all(self):
+    def cut_fill_all(self, sheet_json, name_dir, jpg_dir, path):
         """
         全量剪裁填空
         """
@@ -230,20 +230,20 @@ class COcr():
                     i = 0
                     jpg_name = name + "-" + str(i + page) + ".jpg"
                     while jpg_name in jpg_dir:
-                        select_x = sheet["dot"][0] + width_less
-                        select_y = sheet["dot"][1] + height_less
+                        select_x = sheet["dot"][0] + self.width_less
+                        select_y = sheet["dot"][1] + self.height_less
                         img = cv2.imread(path + "\\" + jpg_name)
-                        crop_img = img[int(select_y * index_h): int(
-                            (select_y + sheet["height"]) * index_h),
-                                   int(select_x * index_w): int(
-                                       (select_x + sheet["width"]) * index_w)]
-                        label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"] + "all", str(int(i / 4)),
+                        crop_img = img[int(select_y * self.index_h): int(
+                            (select_y + sheet["height"]) * self.index_h),
+                                   int(select_x * self.index_w): int(
+                                       (select_x + sheet["width"]) * self.index_w)]
+                        self._label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"] + "all", str(int(i / 4)),
                                                                          str(sheet["index"] + 1), str(1)), name)
 
                         i = i + 4
                         jpg_name = name + "-" + str(i + page) + ".jpg"
 
-    def _cut_fill_ocr(self):
+    def _cut_fill_ocr(self, sheet_json, name_dir, jpg_dir, path):
         """
         剪裁填空题ocr识别区域
         """
@@ -254,20 +254,20 @@ class COcr():
                     i = 0
                     jpg_name = name + "-" + str(i + page) + ".jpg"
                     while jpg_name in jpg_dir:
-                        select_x = sheet["score_dot"][0] + width_less
-                        select_y = sheet["score_dot"][1] + height_less
+                        select_x = sheet["score_dot"][0] + self.width_less
+                        select_y = sheet["score_dot"][1] + self.height_less
                         img = cv2.imread(path + "\\" + jpg_name)
-                        crop_img = img[int(select_y * index_h): int(
-                            (select_y + sheet["score_height"]) * index_h),
-                                   int(select_x * index_w): int(
-                                       (select_x + sheet["score_width"]) * index_w)]
-                        label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"] + "ocr", str(int(i / 4)),
+                        crop_img = img[int(select_y * self.index_h): int(
+                            (select_y + sheet["score_height"]) * self.index_h),
+                                   int(select_x * self.index_w): int(
+                                       (select_x + sheet["score_width"]) * self.index_w)]
+                        self._label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"] + "ocr", str(int(i / 4)),
                                                                          str(sheet["index"] + 1), str(1)), name)
 
                         i = i + 4
                         jpg_name = name + "-" + str(i + page) + ".jpg"
 
-    def _cut_answer_all(self):
+    def _cut_answer_all(self, sheet_json, name_dir, jpg_dir, path):
         """
         全量剪裁简答题
         """
@@ -278,20 +278,20 @@ class COcr():
                     i = 0
                     jpg_name = name + "-" + str(i + page) + ".jpg"
                     while jpg_name in jpg_dir:
-                        select_x = sheet["dot"][0] + width_less
-                        select_y = sheet["dot"][1] + height_less
+                        select_x = sheet["dot"][0] + self.width_less
+                        select_y = sheet["dot"][1] + self.height_less
                         img = cv2.imread(path + "\\" + jpg_name)
-                        crop_img = img[int(select_y * index_h): int(
-                            (select_y + sheet["height"]) * index_h),
-                                   int(select_x * index_w): int(
-                                       (select_x + sheet["width"]) * index_w)]
-                        label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"] + "all", str(int(i / 4)),
+                        crop_img = img[int(select_y * self.index_h): int(
+                            (select_y + sheet["height"]) * self.index_h),
+                                   int(select_x * self.index_w): int(
+                                       (select_x + sheet["width"]) * self.index_w)]
+                        self._label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"] + "all", str(int(i / 4)),
                                                                          str(sheet["index"] + 1), str(1)), name)
 
                         i = i + 4
                         jpg_name = name + "-" + str(i + page) + ".jpg"
 
-    def _cut_answer_ocr(self):
+    def _cut_answer_ocr(self, sheet_json, name_dir, jpg_dir, path):
         """
         剪裁简答题ocr识别区域
         """
@@ -302,14 +302,14 @@ class COcr():
                     i = 0
                     jpg_name = name + "-" + str(i + page) + ".jpg"
                     while jpg_name in jpg_dir:
-                        select_x = sheet["score_dot"][0] + width_less
-                        select_y = sheet["score_dot"][1] + height_less
+                        select_x = sheet["score_dot"][0] + self.width_less
+                        select_y = sheet["score_dot"][1] + self.height_less
                         img = cv2.imread(path + "\\" + jpg_name)
-                        crop_img = img[int(select_y * index_h): int(
-                            (select_y + sheet["score_height"]) * index_h),
-                                   int(select_x * index_w): int(
-                                       (select_x + sheet["score_width"]) * index_w)]
-                        label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"] + "ocr", str(int(i / 4)),
+                        crop_img = img[int(select_y * self.index_h): int(
+                            (select_y + sheet["score_height"]) * self.index_h),
+                                   int(select_x * self.index_w): int(
+                                       (select_x + sheet["score_width"]) * self.index_w)]
+                        self._label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"] + "ocr", str(int(i / 4)),
                                                                          str(sheet["index"] + 1), str(1)), name)
 
                         i = i + 4
