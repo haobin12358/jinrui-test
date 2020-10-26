@@ -1,18 +1,27 @@
 import os
 import re
+from datetime import datetime
+
 from PIL import Image
 from PIL import ImageFont as imf
 from PIL import ImageDraw as imd
 import matplotlib.pyplot as plt
 from flask import current_app
 
+from jinrui.extensions.error_response import ParamsError
+from jinrui.extensions.register_ext import ali_oss
+
+
 class CAutopic():
 
     def get_eqcontent(self, str_eq):
-        eqcontent = \
-            re.findall(r'''<w:fldChar w:fldCharType="begin"/>eq (.*?)<w:fldChar w:fldCharType="end"/>''', str_eq)[0]
-        current_app.logger.info(eqcontent)
-        return eqcontent
+        try:
+            eqcontent = \
+                re.findall(r'''<w:fldChar w:fldCharType="begin"/>eq (.*?)<w:fldChar w:fldCharType="end"/>''', str_eq)[0]
+            current_app.logger.info(eqcontent)
+            return eqcontent
+        except:
+            raise ParamsError('数据异常')
 
     def draw_pic(self, deaL_str, file_path, img_size=[]):
         if not img_size:
@@ -53,6 +62,16 @@ class CAutopic():
 
         self.formula2img(draw_str, file_path, img_size=img_size, font_size=64)
         # todo 上传oss
+        time_now = datetime.now()
+        year = str(time_now.year)
+        month = str(time_now.month)
+        day = str(time_now.day)
+        img_name = str(file_path).split('/')[-1]
+        data = '/img/{folder}/{year}/{month}/{day}/{img_name}'.format(folder='tmp', year=year,
+                                                                      month=month, day=day,
+                                                                      img_name=img_name)
+
+        self.upload_to_oss(file_path, data[1:], 'eq域')
         return True
 
     def split_o(self, str_eq, file_path):
@@ -395,3 +414,12 @@ class CAutopic():
                     arrs.pop()
         current_app.logger.info(brac_dict)
         return brac_dict
+
+    @staticmethod
+    def upload_to_oss(file_data, file_name, msg=''):
+        if current_app.config.get('IMG_TO_OSS'):
+            try:
+                ali_oss.save(data=file_data, filename=file_name)
+            except Exception as e:
+                current_app.logger.error(">>> {} 上传到OSS出错 : {}  <<<".format(msg, e))
+                raise ParamsError('服务器繁忙，请稍后再试')
