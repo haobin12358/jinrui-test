@@ -130,6 +130,8 @@ class j_answer_pdf(Base):
     pdf_status = Column(String(10), comment="300301未解析300302已解析300303解析失败300304解析中")
     pdf_url = Column(String(255), comment="pdf地址")
     pdf_address = Column(Text, comment="pdf原始地址")
+    pdf_ip = Column(String(20), comment="pdf上传ip")
+    pdf_school = Column(String(255), comment="pdf上传学校")
 
 class j_answer_png(Base):
     """
@@ -180,3 +182,66 @@ class j_answer_sheet(Base):
     update_time = Column(DateTime, comment="更新时间")
     name = Column(Text, comment="答题卡名")
     url = Column(Text, comment="答题卡链接")
+
+class j_manager(Base):
+    """
+    账号
+    """
+    __tablename__ = "j_manager"
+    id = Column(String(32), primary_key=True)
+    name = Column(String(128), nullable=False, comment="姓名")
+    nick_name = Column(String(32), comment="昵称")
+    teacher_number = Column(String(32), comment="工号")
+    phone = Column(String(128), comment="手机号")
+    password = Column(String(128), nullable=False, comment="密码")
+    sort = Column(String(32), nullable=False, comment="排序")
+    openid = Column(String(32), comment="微信openid")
+    head_image = Column(String(32), comment="头像")
+    create_time = Column(DateTime, comment="创建时间")
+    update_time = Column(DateTime, comment="更新时间")
+    status = Column(Boolean, comment="用户状态0冻结1正常")
+    last_login_time = Column(DateTime)
+    structures = Column(String(255))
+
+class j_role(Base):
+    """
+    用户组织关联
+    """
+    __tablename__ = "j_role"
+    id = Column(String(32), primary_key=True)
+    manager_id = Column(String(32), nullable=False, comment="用户id")
+    org_id = Column(String(32), nullable=False, comment="组织id")
+    role_type = Column(String(10), comment="角色类型")
+    course = Column(String(11), comment="教师科目类型")
+    create_time = Column(DateTime, comment="创建时间")
+    update_time = Column(DateTime, comment="更新时间")
+
+class j_organization(Base):
+    """
+    组织表
+    """
+    __tablename__ = "j_organization"
+    id = Column(String(32), primary_key=True)
+    name = Column(String(32), nullable=False, comment="组织名称")
+    sort = Column(Integer, nullable=False, comment="序号")
+    parent_org_id = Column(String(32), nullable=False, comment="上级组织id")
+    role_type = Column(String(10), nullable=False, comment="角色类型")
+    description = Column(String(512), comment="描述")
+    area_id = Column(Integer, comment="区域id")
+    joint_name_one = Column(String(128), comment="冗余级联名称省市区学校")
+    joint_name_two = Column(String(128), comment="冗余级联名称年级班")
+    status = Column(Integer, comment="组织状态0删除1开启", nullable=False)
+    parent_org = Column(String(255))
+
+class j_school_network(Base):
+    """
+    学校设备管理
+    """
+    __tablename__ = "j_school_network"
+    isdelete = Column(Boolean, default=False, comment='是否删除')
+    createtime = Column(DateTime, default=datetime.now, comment='创建时间')
+    updatetime = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')
+    net_id = Column(String(64), primary_key=True)
+    net_ip = Column(String(20), nullable=False, comment="固定网段")
+    school_name = Column(String(255), nullable=False, comment="学校名称")
+    school_position = Column(String(255), comment="设备备注")

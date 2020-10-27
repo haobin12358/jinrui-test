@@ -8,8 +8,9 @@ from jinrui.config.secret import ACCESS_KEY_SECRET, ACCESS_KEY_ID, ALIOSS_ENDPOI
 from jinrui.extensions.register_ext import db
 from ..extensions.params_validates import parameter_required
 from jinrui.extensions.error_response import ErrorFileType, ErrorAnswerType
-from jinrui.models.jinrui import j_question, j_answer_zip, j_answer_pdf, j_paper, j_answer_sheet, j_answer_png
-from flask import current_app
+from jinrui.models.jinrui import j_manager, j_answer_zip, j_answer_pdf, j_paper, j_answer_sheet, j_answer_png, \
+    j_role, j_organization
+from flask import current_app, request
 
 class CAnswer():
 
@@ -23,6 +24,21 @@ class CAnswer():
         if data.get("type") not in ["0", "1"]:
             return ErrorAnswerType("请研发检查传递值...")
 
+        manager = j_manager.query.filter(j_manager.id == data.get("id")).first_("未找到该用户")
+
+        roles = j_role.query.filter(j_role.manager_id == data.get("id")).all()
+        school_name = ""
+        for role in roles:
+            org_id = role.org_id
+            organization = j_organization.query.filter(j_organization.id == org_id).first()
+            if organization.role_type == "SCHOOL":
+                school_name = organization.name
+            else:
+                while organization and not school_name:
+                    organization = j_organization.query.filter(j_organization.parent_org_id == organization.id).first()
+                    if organization and organization.role_type == "SCHOOL":
+                        school_name = organization.name
+
         zip_uuid = str(uuid.uuid1())
         # 将zip存储进表，防止解析失败或者趸机
         with db.auto_commit():
@@ -32,7 +48,7 @@ class CAnswer():
                 "updatetime": datetime.now(),
                 "zip_id": zip_uuid,
                 "zip_url": data.get("url"),
-                "zip_upload_user": "system",
+                "zip_upload_user": manager.name,
                 "zip_status": "300101"
             }
             zip_instance = j_answer_zip.create(zip_dict)
@@ -98,7 +114,9 @@ class CAnswer():
                         "sheet_dict": sheet.json,
                         "pdf_status": "300301",
                         "pdf_url": pdf_url,
-                        "pdf_address": "zip"
+                        "pdf_address": "zip",
+                        "pdf_school": school_name,
+                        "pdf_ip": request.remote_addr
                     }
 
                     pdf_instance = j_answer_pdf.create(pdf_dict)
