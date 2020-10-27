@@ -41,21 +41,3 @@ class Enum(_Enum):
     def all_member(cls):
         return [x.name for x in cls._member_map_.values()]
 
-
-if __name__ == '__main__':
-    class ProductStatus(Enum):
-        """商品状态"""
-        usual = (0, '正常')  # 正常
-        auditing = (10, '审核中')  # 审核中
-        off_shelves = 60  # 下架
-        all = None
-
-
-    """
-       使用方法:
-       ProductStatus(10).name --->  auditing
-       ProductStatus(10).zh_value   --->  审核中
-       ProductStatus.auditing.zh_value   --> 审核中
-       ProductStatus.auditing.value --> 10
-    """
-    print(ProductStatus.auditing.zh_value)

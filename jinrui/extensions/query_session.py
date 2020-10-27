@@ -79,8 +79,8 @@ class Query(_Query):
         :return: sqlalchemy对象列表
         """
         args = request.args.to_dict()
-        page = args.get('page_num') or 1
-        count = args.get('page_size') or 15
+        page = args.get('current') or 1
+        count = args.get('size') or 15
         if not page and not count:
             return self.all()
         try:
