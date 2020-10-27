@@ -79,6 +79,7 @@ class CAnswer():
         # 获取pdf文件列表
         pdf_file = zip_save_path + "_files"
         pdfs = os.listdir(pdf_file)
+        upload_id = str(uuid.uuid1())
         with db.auto_commit():
             # 遍历提交pdf到数据库
             for pdf in pdfs:
@@ -110,7 +111,8 @@ class CAnswer():
                         "pdf_url": pdf_url,
                         "pdf_address": "zip",
                         "pdf_school": school_name,
-                        "pdf_ip": request.remote_addr
+                        "pdf_ip": request.remote_addr,
+                        "upload_id": upload_id
                     }
 
                     pdf_instance = j_answer_pdf.create(pdf_dict)
@@ -126,7 +128,7 @@ class CAnswer():
                 "is_delete": 0,
                 "create_time": datetime.now(),
                 "update_time": datetime.now(),
-                "id": zip_uuid,
+                "id": upload_id,
                 "upload_by": manager.name,
                 "status": "处理中",
                 "url": data.get("url")

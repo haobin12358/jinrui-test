@@ -132,6 +132,7 @@ class j_answer_pdf(Base):
     pdf_address = Column(Text, comment="pdf原始地址")
     pdf_ip = Column(String(20), comment="pdf上传ip")
     pdf_school = Column(String(255), comment="pdf上传学校")
+    upload_id = Column(String(64), comment="上传记录id")
 
 class j_answer_png(Base):
     """
