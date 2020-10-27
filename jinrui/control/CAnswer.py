@@ -9,7 +9,7 @@ from jinrui.extensions.register_ext import db
 from ..extensions.params_validates import parameter_required
 from jinrui.extensions.error_response import ErrorFileType, ErrorAnswerType
 from jinrui.models.jinrui import j_manager, j_answer_zip, j_answer_pdf, j_paper, j_answer_sheet, j_answer_png, \
-    j_role, j_organization
+    j_role, j_organization, j_school_network, j_answer_upload
 from flask import current_app, request
 
 class CAnswer():
@@ -26,18 +26,12 @@ class CAnswer():
 
         manager = j_manager.query.filter(j_manager.id == data.get("id")).first_("未找到该用户")
 
-        roles = j_role.query.filter(j_role.manager_id == data.get("id")).all()
-        school_name = ""
-        for role in roles:
-            org_id = role.org_id
-            organization = j_organization.query.filter(j_organization.id == org_id).first()
-            if organization.role_type == "SCHOOL":
-                school_name = organization.name
-            else:
-                while organization and not school_name:
-                    organization = j_organization.query.filter(j_organization.parent_org_id == organization.id).first()
-                    if organization and organization.role_type == "SCHOOL":
-                        school_name = organization.name
+        pdf_ip = request.remote_addr
+        school_network = j_school_network.query.filter(j_school_network.net_ip == pdf_ip).first()
+        if school_network:
+            school_name = school_network.school_name
+        else:
+            school_name = None
 
         zip_uuid = str(uuid.uuid1())
         # 将zip存储进表，防止解析失败或者趸机
@@ -85,6 +79,7 @@ class CAnswer():
         # 获取pdf文件列表
         pdf_file = zip_save_path + "_files"
         pdfs = os.listdir(pdf_file)
+        upload_id = str(uuid.uuid1())
         with db.auto_commit():
             # 遍历提交pdf到数据库
             for pdf in pdfs:
@@ -116,7 +111,8 @@ class CAnswer():
                         "pdf_url": pdf_url,
                         "pdf_address": "zip",
                         "pdf_school": school_name,
-                        "pdf_ip": request.remote_addr
+                        "pdf_ip": request.remote_addr,
+                        "upload_id": upload_id
                     }
 
                     pdf_instance = j_answer_pdf.create(pdf_dict)
@@ -127,6 +123,18 @@ class CAnswer():
                 "zip_status": "300102"
             }, null="not")
             db.session.add(zip_instance)
+
+            upload_dict = {
+                "is_delete": 0,
+                "create_time": datetime.now(),
+                "update_time": datetime.now(),
+                "id": upload_id,
+                "upload_by": manager.name,
+                "status": "处理中",
+                "url": data.get("url")
+            }
+            upload_instance = j_answer_upload.create(upload_dict)
+            db.session.add(upload_instance)
 
         shutil.rmtree(zip_path)
         return {

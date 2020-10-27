@@ -132,6 +132,7 @@ class j_answer_pdf(Base):
     pdf_address = Column(Text, comment="pdf原始地址")
     pdf_ip = Column(String(20), comment="pdf上传ip")
     pdf_school = Column(String(255), comment="pdf上传学校")
+    upload_id = Column(String(64), comment="上传记录id")
 
 class j_answer_png(Base):
     """
@@ -161,12 +162,12 @@ class j_answer_upload(Base):
     上传记录
     """
     __tablename__ = "j_answer_upload"
-    isdelete = Column(Boolean, default=False, comment='是否删除')
-    createtime = Column(DateTime, default=datetime.now, comment='创建时间')
-    updatetime = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')
+    is_delete = Column(Boolean, default=False, comment='是否删除')
+    create_time = Column(DateTime, default=datetime.now, comment='创建时间')
+    update_time = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')
     id = Column(String(64), primary_key=True)
-    uploadBy = Column(String(255), comment="上传人")
-    status = Column(String(10), nullable=False, comment="待分配/已分配/分配中/文件错误")
+    upload_by = Column(String(255), comment="上传人")
+    status = Column(String(10), nullable=False, comment="上传中/待分配/已分配/分配中/文件错误")
     url = Column(String(255), comment="上传地址")
 
 
