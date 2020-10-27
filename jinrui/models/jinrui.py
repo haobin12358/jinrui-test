@@ -81,6 +81,7 @@ class j_answer_booklet(Base):
     url = Column(Text, comment="oss链接")
     upload_by = Column(String(32), comment="上传人id")
     grade_num = Column(Integer, comment="已批阅数目")
+    upload_id = Column(String(64), comment="答卷上传记录id")
 
 class j_score(Base):
     """
@@ -98,6 +99,7 @@ class j_score(Base):
     update_time = Column(DateTime, comment="更新时间")
     question_number = Column(Integer, comment="所在试卷的编号")
     answer = Column(String(16), comment="学生答案")
+    status = Column(String(10), comment="303解析失败301解析成功302未批阅304已批阅")
 
 class j_answer_zip(Base):
     """
@@ -128,6 +130,43 @@ class j_answer_pdf(Base):
     pdf_status = Column(String(10), comment="300301未解析300302已解析300303解析失败300304解析中")
     pdf_url = Column(String(255), comment="pdf地址")
     pdf_address = Column(Text, comment="pdf原始地址")
+
+class j_answer_png(Base):
+    """
+    答卷裁剪识别图
+    """
+    __tablename__ = "j_answer_png"
+    isdelete = Column(Boolean, default=False, comment='是否删除')
+    createtime = Column(DateTime, default=datetime.now, comment='创建时间')
+    updatetime = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')
+    png_id = Column(String(64), primary_key=True)
+    png_url = Column(String(255), comment="图片url")
+    pdf_id = Column(String(64), comment="扫描件id")
+    png_result = Column(String(255), comment="解析结果")
+    png_status = Column(String(10), comment="303待处理302已处理301已批阅")
+    png_type = Column(String(10), comment="21单选22多选23判断24填空all25填空ocr26简答all27简答ocr28sn29考号")
+    question = Column(Text, comment="题目")
+    booklet_id = Column(String(64), comment="答卷id")
+    page_url = Column(String(255), comment="该页面url")
+    student_no = Column(String(20), comment="学生考号")
+    student_name = Column(String(255), comment="学生姓名")
+    school = Column(String(255), comment="学校名称")
+    result_score = Column(Integer, comment="考卷分数")
+    result_update = Column(Integer, comment="考卷分数订正")
+
+class j_answer_upload(Base):
+    """
+    上传记录
+    """
+    __tablename__ = "j_answer_upload"
+    isdelete = Column(Boolean, default=False, comment='是否删除')
+    createtime = Column(DateTime, default=datetime.now, comment='创建时间')
+    updatetime = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')
+    id = Column(String(64), primary_key=True)
+    uploadBy = Column(String(255), comment="上传人")
+    status = Column(String(10), nullable=False, comment="待分配/已分配/分配中/文件错误")
+    url = Column(String(255), comment="上传地址")
+
 
 class j_answer_sheet(Base):
     """
