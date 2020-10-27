@@ -81,6 +81,7 @@ class j_answer_booklet(Base):
     url = Column(Text, comment="oss链接")
     upload_by = Column(String(32), comment="上传人id")
     grade_num = Column(Integer, comment="已批阅数目")
+    upload_id = Column(String(64), comment="答卷上传记录id")
 
 class j_score(Base):
     """
@@ -98,6 +99,7 @@ class j_score(Base):
     update_time = Column(DateTime, comment="更新时间")
     question_number = Column(Integer, comment="所在试卷的编号")
     answer = Column(String(16), comment="学生答案")
+    status = Column(String(10), comment="303解析失败301解析成功302未批阅304已批阅")
 
 class j_answer_zip(Base):
     """
@@ -125,9 +127,48 @@ class j_answer_pdf(Base):
     pdf_use = Column(String(10), nullable=False, comment="300201先批后扫300202先扫后批")
     paper_name = Column(String(255), nullable=False, comment="试卷名")
     sheet_dict = Column(Text, comment="答题卡json")
-    pdf_status = Column(String(10), comment="300301未解析300302已解析300303解析失败")
+    pdf_status = Column(String(10), comment="300301未解析300302已解析300303解析失败300304解析中")
     pdf_url = Column(String(255), comment="pdf地址")
     pdf_address = Column(Text, comment="pdf原始地址")
+    pdf_ip = Column(String(20), comment="pdf上传ip")
+    pdf_school = Column(String(255), comment="pdf上传学校")
+
+class j_answer_png(Base):
+    """
+    答卷裁剪识别图
+    """
+    __tablename__ = "j_answer_png"
+    isdelete = Column(Boolean, default=False, comment='是否删除')
+    createtime = Column(DateTime, default=datetime.now, comment='创建时间')
+    updatetime = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')
+    png_id = Column(String(64), primary_key=True)
+    png_url = Column(String(255), comment="图片url")
+    pdf_id = Column(String(64), comment="扫描件id")
+    png_result = Column(String(255), comment="解析结果")
+    png_status = Column(String(10), comment="303待处理302已处理301已批阅")
+    png_type = Column(String(10), comment="21单选22多选23判断24填空all25填空ocr26简答all27简答ocr28sn29考号")
+    question = Column(Text, comment="题目")
+    booklet_id = Column(String(64), comment="答卷id")
+    page_url = Column(String(255), comment="该页面url")
+    student_no = Column(String(20), comment="学生考号")
+    student_name = Column(String(255), comment="学生姓名")
+    school = Column(String(255), comment="学校名称")
+    result_score = Column(Integer, comment="考卷分数")
+    result_update = Column(Integer, comment="考卷分数订正")
+
+class j_answer_upload(Base):
+    """
+    上传记录
+    """
+    __tablename__ = "j_answer_upload"
+    isdelete = Column(Boolean, default=False, comment='是否删除')
+    createtime = Column(DateTime, default=datetime.now, comment='创建时间')
+    updatetime = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')
+    id = Column(String(64), primary_key=True)
+    uploadBy = Column(String(255), comment="上传人")
+    status = Column(String(10), nullable=False, comment="待分配/已分配/分配中/文件错误")
+    url = Column(String(255), comment="上传地址")
+
 
 class j_answer_sheet(Base):
     """
@@ -141,3 +182,66 @@ class j_answer_sheet(Base):
     update_time = Column(DateTime, comment="更新时间")
     name = Column(Text, comment="答题卡名")
     url = Column(Text, comment="答题卡链接")
+
+class j_manager(Base):
+    """
+    账号
+    """
+    __tablename__ = "j_manager"
+    id = Column(String(32), primary_key=True)
+    name = Column(String(128), nullable=False, comment="姓名")
+    nick_name = Column(String(32), comment="昵称")
+    teacher_number = Column(String(32), comment="工号")
+    phone = Column(String(128), comment="手机号")
+    password = Column(String(128), nullable=False, comment="密码")
+    sort = Column(String(32), nullable=False, comment="排序")
+    openid = Column(String(32), comment="微信openid")
+    head_image = Column(String(32), comment="头像")
+    create_time = Column(DateTime, comment="创建时间")
+    update_time = Column(DateTime, comment="更新时间")
+    status = Column(Boolean, comment="用户状态0冻结1正常")
+    last_login_time = Column(DateTime)
+    structures = Column(String(255))
+
+class j_role(Base):
+    """
+    用户组织关联
+    """
+    __tablename__ = "j_role"
+    id = Column(String(32), primary_key=True)
+    manager_id = Column(String(32), nullable=False, comment="用户id")
+    org_id = Column(String(32), nullable=False, comment="组织id")
+    role_type = Column(String(10), comment="角色类型")
+    course = Column(String(11), comment="教师科目类型")
+    create_time = Column(DateTime, comment="创建时间")
+    update_time = Column(DateTime, comment="更新时间")
+
+class j_organization(Base):
+    """
+    组织表
+    """
+    __tablename__ = "j_organization"
+    id = Column(String(32), primary_key=True)
+    name = Column(String(32), nullable=False, comment="组织名称")
+    sort = Column(Integer, nullable=False, comment="序号")
+    parent_org_id = Column(String(32), nullable=False, comment="上级组织id")
+    role_type = Column(String(10), nullable=False, comment="角色类型")
+    description = Column(String(512), comment="描述")
+    area_id = Column(Integer, comment="区域id")
+    joint_name_one = Column(String(128), comment="冗余级联名称省市区学校")
+    joint_name_two = Column(String(128), comment="冗余级联名称年级班")
+    status = Column(Integer, comment="组织状态0删除1开启", nullable=False)
+    parent_org = Column(String(255))
+
+class j_school_network(Base):
+    """
+    学校设备管理
+    """
+    __tablename__ = "j_school_network"
+    isdelete = Column(Boolean, default=False, comment='是否删除')
+    createtime = Column(DateTime, default=datetime.now, comment='创建时间')
+    updatetime = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')
+    net_id = Column(String(64), primary_key=True)
+    net_ip = Column(String(20), nullable=False, comment="固定网段")
+    school_name = Column(String(255), nullable=False, comment="学校名称")
+    school_position = Column(String(255), comment="设备备注")
