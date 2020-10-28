@@ -220,3 +220,10 @@ class CAnswer():
             "success": True,
             "message": "订正分数成功"
         }
+
+    def upload_pdf(self):
+        pass
+
+    def get_pdf_list(self):
+        pass
+
