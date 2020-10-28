@@ -200,7 +200,11 @@ def transfordoc(filepath):
                 db_path = 'https://jinrui.sanbinit.cn/img/{folder}/{year}/{month}/{day}/{img_name}'.format(
                     folder='tmp', year=year, month=month, day=day,img_name=img_name)
                 # new_eq_str = "<img src='{0}'></img>".format(db_path)
-                new_eq_str = """<img src="{0}"></img>""".format(newFile)
+                img_eq = Image.open(newFile)
+                x, y = img_eq.size
+                high = 20
+                width = y / (x / 20)
+                new_eq_str = """<img src="{0}" high={1} width={2}></img>""".format(newFile, high, width)
                 print(new_eq_str)
                 # use_str_list = re.findall(r'<w:fldChar w:fldCharType="begin"/>eq (.*?)<w:fldChar w:fldCharType="end"/>',  use_str)
                 # print(use_str_list)
