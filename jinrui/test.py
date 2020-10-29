@@ -5,7 +5,8 @@
 import os
 import re, shutil, zipfile
 from datetime import datetime
-
+import string
+import random
 from PIL import Image
 from PIL import ImageFont as imf
 from PIL import ImageDraw as imd
@@ -16,247 +17,15 @@ from lxml import etree
 # from .control.Cautopic import CAutopic
 
 
-def whichin(text):
-    if "</w:t>" in text:
-        if "</w:instrText" in text:
-            if "</w:drawing>" in text:
-                return ["<w:t", "</w:t>", "<w:instrText", "</w:instrText>", "<a:blip", ">"]
-            else:
-                return ["<w:t", "</w:t>", "<w:instrText", "</w:instrText>"]
-        elif "</w:drawing>" in text:
-            return ["<w:t", "</w:t>", "<a:blip", ">"]
-        else:
-            return ["<w:t", "</w:t>"]
-    elif "</w:instrText" in text:
-        if "</w:drawing>" in text:
-            return ["<w:instrText", "</w:instrText>", "<a:blip", ">"]
-        else:
-            return ["<w:instrText", "</w:instrText>"]
-    elif "</w:drawing>" in text:
-        return ["<a:blip", ">"]
-    else:
-        return []
-
 # if __name__ == "__main__":
     # 定义路径，转化名称为英文，否则无法转成zip，转化成zip解压
     # path = "C:\\Users\\Administrator\\Desktop\\jinrui\\math\\数学  推演卷（一） C卷答案.docx"
     # path2 = "C:\\Users\\Administrator\\Desktop\\jinrui\\math\\testCA.docx"
     # path3 = "C:\\Users\\Administrator\\Desktop\\jinrui\\math\\testCA.zip"
-def transfordoc(filepath):
-    path = filepath
-    path2 = os.path.dirname(filepath) + '\\tmp.docx'
-    path3 = os.path.join(os.path.dirname(filepath), 'tmp.zip')
-    shutil.copyfile(path, path2)
-    os.rename(path2, path3)
-    zip_file = zipfile.ZipFile(path3)
-    if os.path.isdir(path3 + "_files"):
-        pass
-    else:
-        os.mkdir(path3 + "_files")
-    for names in zip_file.namelist():
-        zip_file.extract(names, path3 + "_files/")
-    zip_file.close()
-
-    # 本来用于上传oss的，需要重写
-    header = {
-        "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxMzAyNTkxMzMxNzcxNzQ4MzUyIiwiaWF0IjoxNjAyNTY1NDUwLCJleHAiOjE2MDI2NTE4NTB9.HO0k0uePIIXd0-pxh2nJAK8NJvNNmQdqsMz_3ZprAzg_uk6nb3hCX-w_RlmXpIzV_o-uDRovIRe5_DbFgQdp3A"
-    }
-    url = "https://api.jinrui.sanbinit.cn/file/upload"
-
-    # 获取原word文档的内容
-    doc = Document(path)
-    doc_xml = doc._body._element.xml
-    # 获取资源id对应关系
-    doc_rels = doc.part._rels
-    rId_list = list(doc_rels)
-    print(rId_list)
-    print(len(rId_list))
-    target_list = []
-
-    for rel in doc_rels:
-        rel = doc_rels[rel]
-        target_list.append(rel.target_ref)
-        if "image" in rel.target_ref:
-            img_name = re.findall("/(.*)", rel.target_ref)[0]
-    # 转化lxml结点
-    body_xml = etree.fromstring(doc_xml)  # 转换成lxml结点
-    print(target_list)
-    print(len(target_list))
-    i = 0
-    paper_num = 0
-    paper_dict = {}
-    # 遍历lxml
-    while i < len(body_xml):
-        # print("第{0}行".format(str(i + 1)))
-        # 调试用的无视
-        if i == 2222:
-            print(str(etree.tounicode(body_xml[i])))
-        # 讲需要的内容过滤成正则的对子
-        in_text = whichin(str(etree.tounicode(body_xml[i])))
-        # 增加文字格式额外条件
-        if "</w:instrText>" in in_text or "</w:t>":
-            in_text.append("<w:vertAlign")
-            in_text.append("/>")
-        # 如果条件是空或者不是对子，定义正则规则
-        if not len(in_text) or len(in_text) % 2 != 0:
-            re_str = "<w:r>|</w:r>"
-        else:
-            re_str = "<w:r>|</w:r>"
-            # 如果存在eq域
-            if "</w:instrText>" in in_text:
-                re_str = re_str + """|<w:fldChar w:fldCharType="begin"/>""" + """|<w:fldChar w:fldCharType="end"/>"""
-            j = 0
-            while j < len(in_text):
-                if re_str:
-                    re_str = re_str + "|"
-                re_str = re_str + in_text[j] + ".*?" + in_text[j + 1]
-                j = j + 2
-        # if i == 17:
-            # print(etree.tounicode(body_xml[i]))
-        # 如果存在表格
-        if "<w:tbl " in str(etree.tounicode(body_xml[i])):
-            re_str = re_str + """|<w:tbl """
-        if "<w:tr>" in str(etree.tounicode(body_xml[i])):
-            re_str = re_str + """|<w:tr>"""
-        if "</w:tr>" in str(etree.tounicode(body_xml[i])):
-            re_str = re_str + """|</w:tr>"""
-        if "<w:tc>" in str(etree.tounicode(body_xml[i])):
-            re_str = re_str + """|<w:tc>"""
-        if "</w:tc>" in str(etree.tounicode(body_xml[i])):
-            re_str = re_str + """|</w:tc>"""
-        if "</w:tbl>" in str(etree.tounicode(body_xml[i])):
-            re_str = re_str + """|</w:tbl>"""
-        # 正则解析
-        if re_str:
-            use_list = re.findall(r"{0}".format(re_str), str(etree.tounicode(body_xml[i])))
-        else:
-            use_list = []
-        use_str = ""
-        index = 0
-        # 处理上角标和下角标
-        while index < len(use_list):
-            if index + 3 < len(use_list):
-                if use_list[index] == "<w:r>" and use_list[index + 1] == """<w:vertAlign w:val="superscript"/>""":
-                    use_list[index] = "<sup>"
-                    use_list[index + 1] = ""
-                    use_list[index + 3] = "</sup>"
-                if use_list[index] == "<w:r>" and use_list[index + 1] == """<w:vertAlign w:val="subscript"/>""":
-                    use_list[index] = "<sub>"
-                    use_list[index + 1] = ""
-                    use_list[index + 3] = "</sub>"
-            # 处理无效标记
-            use_str = use_str + use_list[index].replace("<w:t>", "").replace("</w:t>", "").replace("""<w:t xml:space="preserve">""", "")
-            index = index + 1
-        # 处理无效标记
-        use_str = use_str.replace("<w:r>", "").replace("</w:r>", "").replace("\u3000", "")
-        # 处理图片
-        if "<a:blip" in use_str:
-            for rId in rId_list:
-
-                if """<a:blip r:embed="{0}"/>""".format(rId) in use_str:
-                    target_list_dict = target_list[rId_list.index(rId)].split("/")
-                    print(use_str)
-                    print(">>>>>>>>>>>target_dict:" + str(target_list_dict))
-                    if len(target_list_dict) > 1:
-                        print(">>>>>>>>>>target_list_dict:" + str(target_list_dict))
-                        picture_path = path3 + "_files\\word" + "\\" + target_list_dict[0] + "\\" + target_list_dict[1]
-                        files = {
-                            "file": (target_list_dict[1], open(r"{0}".format(picture_path), "rb"), "image/png")
-                        }
-                        # response = requests.post(headers=header, files=files, url=url)
-                        # json_response = json.loads(response.content)
-                        # url_response = json_response["data"]["url"]
-                        # print(">>>>>>>>>>>>>>>>>>url_response:" + str(url_response))
-                        # use_str = use_str.replace("""<a:blip r:embed="{0}"/>""".format(rId),
-                        #                           "<img src='{0}'></img>".format(url_response))
-                    else:
-                        use_str = use_str.replace("""<a:blip r:embed="{0}"/>""".format(rId),
-                                                  "<img src='{0}'></img>".format(str(target_list[rId_list.index(rId)])))
-        # 用于临时处理eq域可先注释掉
-        use_str = use_str.replace("<w:instrText>", "").replace("</w:instrText>", "")\
-            .replace("""<w:instrText xml:space="preserve">""", "")
-        if '<w:fldChar w:fldCharType="begin"/>' in use_str:
-            print(use_str)
-            tmp_use_str = use_str
-            start_str = '<w:fldChar w:fldCharType="begin"/>'
-            start_index = use_str.index(start_str)
-            end_str = '<w:fldChar w:fldCharType="end"/>'
-            end_index = use_str.index(end_str)
-
-            eq_list = re.findall(
-                r'''<w:fldChar w:fldCharType="begin"/>eq (.*?)<w:fldChar w:fldCharType="end"/>''', use_str)
-            # use_str = ''
-            for eq_index, _ in enumerate(eq_list):
-                img_name = random_name('.png')
-                time_now = datetime.now()
-                year = str(time_now.year)
-                month = str(time_now.month)
-                day = str(time_now.day)
-                newPath = os.path.join('d:\\', 'img', 'tmp', year, month, day)
-                if not os.path.isdir(newPath):
-                    os.makedirs(newPath)
-                newFile = os.path.join(newPath, img_name)
-                CAutopic().draw_pic(tmp_use_str, newFile, eq_index)
-                db_path = 'https://jinrui.sanbinit.cn/img/{folder}/{year}/{month}/{day}/{img_name}'.format(
-                    folder='tmp', year=year, month=month, day=day,img_name=img_name)
-                # new_eq_str = "<img src='{0}'></img>".format(db_path)
-                img_eq = Image.open(newFile)
-                x, y = img_eq.size
-                high = 20
-                width = y / (x / 20)
-                new_eq_str = """<img src="{0}" high={1} width={2}></img>""".format(newFile, high, width)
-                print(new_eq_str)
-                # use_str_list = re.findall(r'<w:fldChar w:fldCharType="begin"/>eq (.*?)<w:fldChar w:fldCharType="end"/>',  use_str)
-                # print(use_str_list)
-                # use_str = re.sub()
-
-                use_str = use_str[:start_index] + new_eq_str + use_str[end_index + len(end_str):]
-                try:
-                    start_index = use_str.index(start_str, end_index)
-                    end_index = use_str.index(end_str, start_index)
-                except:
-                    start_index = start_index
-                    end_index = end_index
-
-        # 处理表格
-        use_str = use_str\
-            .replace("<w:tbl ", """<table border="1">""")\
-            .replace("<w:tr>", "<tr>")\
-            .replace("<w:tc>", "<td>")\
-            .replace("</w:tc>", "</td>")\
-            .replace("</w:tr>", "</tr>")\
-            .replace("</w:tbl>", "</table>")
-        print(use_str)
-        point_use = "．"  # 用来区分题目的点位
-        # point_use = "."
-        # 题目标号
-        if (str(paper_num + 1) + point_use) in use_str:
-            paper_num = paper_num + 1
-        point_icon = str(paper_num) + point_use
-        # 用于判断大题序号进行过滤
-        pass_list = ["一、", "二、", "三、", "四、", "五、", "六、", "七、", "八、", "九、"]
-        for row in pass_list:
-            if row in use_str and point_icon not in use_str:
-                use_str = ""
-        # 封装json，key为题号，value为题目
-        if point_icon in use_str or str(paper_num) in paper_dict.keys():
-            if str(paper_num) in paper_dict.keys():
-                paper_dict[str(paper_num)] = paper_dict[str(paper_num)] + "<div>" + use_str + "</div>"
-            else:
-                paper_dict[str(paper_num)] = "<div>" + use_str + "</div>"
-        i = i + 1
-    print(paper_dict)
-    # os.remove(path2)
-    os.remove(path3)
-    # os.removedirs(path3+"_files")
 
 
-def random_name(shuffix):
-    import string
-    import random
-    myStr = string.ascii_letters + '12345678'
-    res = ''.join(random.choice(myStr) for _ in range(20)) + shuffix
-    return res
+
+
 
 # from flask import current_app
 
@@ -266,7 +35,220 @@ def random_name(shuffix):
 
 class CAutopic():
 
-    def get_eqcontent(self, str_eq, index):
+    def transfordoc(self, filepath):
+        path = filepath
+        new_tmp_name = self.random_name('.docx')
+        path2 = os.path.join(os.path.dirname(filepath), new_tmp_name)
+        path3 = os.path.join(os.path.dirname(filepath), '.'.join(new_tmp_name.split('.')[:-1]) + '.zip')
+        shutil.copyfile(path, path2)
+        os.rename(path2, path3)
+        zip_file = zipfile.ZipFile(path3)
+        if os.path.isdir(path3 + "_files"):
+            pass
+        else:
+            os.mkdir(path3 + "_files")
+        for names in zip_file.namelist():
+            zip_file.extract(names, path3 + "_files/")
+        zip_file.close()
+
+        # 本来用于上传oss的，需要重写
+        # header = {
+        #     "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxMzAyNTkxMzMxNzcxNzQ4MzUyIiwiaWF0IjoxNjAyNTY1NDUwLCJleHAiOjE2MDI2NTE4NTB9.HO0k0uePIIXd0-pxh2nJAK8NJvNNmQdqsMz_3ZprAzg_uk6nb3hCX-w_RlmXpIzV_o-uDRovIRe5_DbFgQdp3A"
+        # }
+        # url = "https://api.jinrui.sanbinit.cn/file/upload"
+
+        # 获取原word文档的内容
+        doc = Document(path)
+        doc_xml = doc._body._element.xml
+        # 获取资源id对应关系
+        doc_rels = doc.part._rels
+        rId_list = list(doc_rels)
+        print(rId_list)
+        print(len(rId_list))
+        target_list = []
+
+        for rel in doc_rels:
+            rel = doc_rels[rel]
+            target_list.append(rel.target_ref)
+            if "image" in rel.target_ref:
+                img_name = re.findall("/(.*)", rel.target_ref)[0]
+
+        # 转化lxml结点
+        body_xml = etree.fromstring(doc_xml)  # 转换成lxml结点
+        print(target_list)
+        print(len(target_list))
+        i = 0
+        paper_num = 0
+        paper_dict = {}
+        # 遍历lxml
+        while i < len(body_xml):
+            # print("第{0}行".format(str(i + 1)))
+            # 调试用的无视
+            if i == 2222:
+                print(str(etree.tounicode(body_xml[i])))
+            # 讲需要的内容过滤成正则的对子
+            in_text = self.whichin(str(etree.tounicode(body_xml[i])))
+            # 增加文字格式额外条件
+            if "</w:instrText>" in in_text or "</w:t>":
+                in_text.append("<w:vertAlign")
+                in_text.append("/>")
+            # 如果条件是空或者不是对子，定义正则规则
+            if not len(in_text) or len(in_text) % 2 != 0:
+                re_str = "<w:r>|</w:r>"
+            else:
+                re_str = "<w:r>|</w:r>"
+                # 如果存在eq域
+                if "</w:instrText>" in in_text:
+                    re_str = re_str + """|<w:fldChar w:fldCharType="begin"/>""" + """|<w:fldChar w:fldCharType="end"/>"""
+                j = 0
+                while j < len(in_text):
+                    if re_str:
+                        re_str = re_str + "|"
+                    re_str = re_str + in_text[j] + ".*?" + in_text[j + 1]
+                    j = j + 2
+            # if i == 17:
+            # print(etree.tounicode(body_xml[i]))
+            # 如果存在表格
+            if "<w:tbl " in str(etree.tounicode(body_xml[i])):
+                re_str = re_str + """|<w:tbl """
+            if "<w:tr>" in str(etree.tounicode(body_xml[i])):
+                re_str = re_str + """|<w:tr>"""
+            if "</w:tr>" in str(etree.tounicode(body_xml[i])):
+                re_str = re_str + """|</w:tr>"""
+            if "<w:tc>" in str(etree.tounicode(body_xml[i])):
+                re_str = re_str + """|<w:tc>"""
+            if "</w:tc>" in str(etree.tounicode(body_xml[i])):
+                re_str = re_str + """|</w:tc>"""
+            if "</w:tbl>" in str(etree.tounicode(body_xml[i])):
+                re_str = re_str + """|</w:tbl>"""
+            # 正则解析
+            if re_str:
+                use_list = re.findall(r"{0}".format(re_str), str(etree.tounicode(body_xml[i])))
+            else:
+                use_list = []
+            use_str = ""
+            index = 0
+            # 处理上角标和下角标
+            while index < len(use_list):
+                if index + 3 < len(use_list):
+                    if use_list[index] == "<w:r>" and use_list[index + 1] == """<w:vertAlign w:val="superscript"/>""":
+                        use_list[index] = "<sup>"
+                        use_list[index + 1] = ""
+                        use_list[index + 3] = "</sup>"
+                    if use_list[index] == "<w:r>" and use_list[index + 1] == """<w:vertAlign w:val="subscript"/>""":
+                        use_list[index] = "<sub>"
+                        use_list[index + 1] = ""
+                        use_list[index + 3] = "</sub>"
+                # 处理无效标记
+                use_str = use_str + use_list[index].replace("<w:t>", "").replace("</w:t>", "").replace(
+                    """<w:t xml:space="preserve">""", "")
+                index = index + 1
+            # 处理无效标记
+            use_str = use_str.replace("<w:r>", "").replace("</w:r>", "").replace("\u3000", "")
+            # 处理图片
+            if "<a:blip" in use_str:
+                for rId in rId_list:
+
+                    if """<a:blip r:embed="{0}"/>""".format(rId) in use_str:
+                        target_list_dict = target_list[rId_list.index(rId)].split("/")
+                        print(use_str)
+                        print(">>>>>>>>>>>target_dict:" + str(target_list_dict))
+                        if len(target_list_dict) > 1:
+                            print(">>>>>>>>>>target_list_dict:" + str(target_list_dict))
+                            picture_path = path3 + "_files\\word" + "\\" + target_list_dict[0] + "\\" + \
+                                           target_list_dict[1]
+                            # files = {
+                            #     "file": (target_list_dict[1], open(r"{0}".format(picture_path), "rb"), "image/png")
+                            # }
+                            # response = requests.post(headers=header, files=files, url=url)
+                            # json_response = json.loads(response.content)
+                            # url_response = json_response["data"]["url"]
+                            # print(">>>>>>>>>>>>>>>>>>url_response:" + str(url_response))
+                            # use_str = use_str.replace("""<a:blip r:embed="{0}"/>""".format(rId),
+                            #                           "<img src='{0}'></img>".format(url_response))
+                        else:
+                            use_str = use_str.replace("""<a:blip r:embed="{0}"/>""".format(rId),
+                                                      "<img src='{0}'></img>".format(
+                                                          str(target_list[rId_list.index(rId)])))
+            # 用于临时处理eq域可先注释掉
+            use_str = use_str.replace("<w:instrText>", "").replace("</w:instrText>", "") \
+                .replace("""<w:instrText xml:space="preserve">""", "")
+            if '<w:fldChar w:fldCharType="begin"/>' in use_str:
+                print(use_str)
+                tmp_use_str = use_str
+                start_str = '<w:fldChar w:fldCharType="begin"/>'
+                start_index = use_str.index(start_str)
+                end_str = '<w:fldChar w:fldCharType="end"/>'
+                end_index = use_str.index(end_str)
+
+                eq_list = re.findall(
+                    r'''<w:fldChar w:fldCharType="begin"/>eq (.*?)<w:fldChar w:fldCharType="end"/>''', use_str)
+                # use_str = ''
+                for eq_index, _ in enumerate(eq_list):
+                    img_name = self.random_name('.png')
+                    time_now = datetime.now()
+                    year = str(time_now.year)
+                    month = str(time_now.month)
+                    day = str(time_now.day)
+                    newPath = os.path.join('d:\\', 'img', 'tmp', year, month, day)
+                    if not os.path.isdir(newPath):
+                        os.makedirs(newPath)
+                    newFile = os.path.join(newPath, img_name)
+                    self.draw_pic(tmp_use_str, newFile, eq_index)
+                    db_path = 'https://jinrui.sanbinit.cn/img/{folder}/{year}/{month}/{day}/{img_name}'.format(
+                        folder='tmp', year=year, month=month, day=day, img_name=img_name)
+                    # new_eq_str = "<img src='{0}'></img>".format(db_path)
+                    img_eq = Image.open(newFile)
+                    x, y = img_eq.size
+                    high = 20
+                    width = y / (x / 20)
+                    new_eq_str = """<img src="{0}" high={1} width={2}></img>""".format(newFile, high, width)
+                    print(new_eq_str)
+
+                    use_str = use_str[:start_index] + new_eq_str + use_str[end_index + len(end_str):]
+                    try:
+                        start_index = use_str.index(start_str, end_index)
+                        end_index = use_str.index(end_str, start_index)
+                    except:
+                        start_index = start_index
+                        end_index = end_index
+
+            # 处理表格
+            use_str = use_str \
+                .replace("<w:tbl ", """<table border="1">""") \
+                .replace("<w:tr>", "<tr>") \
+                .replace("<w:tc>", "<td>") \
+                .replace("</w:tc>", "</td>") \
+                .replace("</w:tr>", "</tr>") \
+                .replace("</w:tbl>", "</table>")
+            print(use_str)
+            point_use = "．"  # 用来区分题目的点位
+            # point_use = "."
+            # 题目标号
+            if (str(paper_num + 1) + point_use) in use_str:
+                paper_num = paper_num + 1
+            point_icon = str(paper_num) + point_use
+            # 用于判断大题序号进行过滤
+            pass_list = ["一、", "二、", "三、", "四、", "五、", "六、", "七、", "八、", "九、"]
+            for row in pass_list:
+                if row in use_str and point_icon not in use_str:
+                    use_str = ""
+            # 封装json，key为题号，value为题目
+            if point_icon in use_str or str(paper_num) in paper_dict.keys():
+                if str(paper_num) in paper_dict.keys():
+                    paper_dict[str(paper_num)] = paper_dict[str(paper_num)] + "<div>" + use_str + "</div>"
+                else:
+                    paper_dict[str(paper_num)] = "<div>" + use_str + "</div>"
+            i = i + 1
+        print(paper_dict)
+        # os.remove(path2)
+        os.remove(path3)
+        self.del_file(path3+"_files")
+        # os.removedirs(path3+"_files")
+
+    @staticmethod
+    def get_eqcontent(str_eq, index):
+        # 获取解析字符串
         try:
             eqcontent = re.findall(
                 r'''<w:fldChar w:fldCharType="begin"/>eq (.*?)<w:fldChar w:fldCharType="end"/>''', str_eq)
@@ -496,7 +478,7 @@ class CAutopic():
         self.upload_to_oss(file_path, 'eq域')
 
     def deal_f(self, str_eq, file_path, imgsize):
-        # todo 提取$
+
         print(str_eq)
         ep__list = str_eq.split(',')
         frac_str = r'\frac'
@@ -608,7 +590,8 @@ class CAutopic():
             r_str = new_str
         return r_str
 
-    def formula2img(self, str_latex, out_file, img_size=(5, 3), font_size=16):
+    @staticmethod
+    def formula2img(str_latex, out_file, img_size=(5, 3), font_size=16):
         fig = plt.figure(figsize=img_size)
         ax = fig.add_axes([0, 0, 1, 1])
         ax.get_xaxis().set_visible(False)
@@ -620,7 +603,8 @@ class CAutopic():
         # plt.show()
         # print('OK')
 
-    def replace_item(self, item):
+    @staticmethod
+    def replace_item(item):
         # 域标签修改
         if '<sup>' in item:
             item = item.replace('<sup>', '^').replace('</sup>', ' ')
@@ -631,7 +615,8 @@ class CAutopic():
 
         return item
 
-    def replace_sign(self, item):
+    @staticmethod
+    def replace_sign(item):
         # if '≠' in item:
         #     item = item.replace('≠', r'\ne')
         # if '≥' in item:
@@ -654,7 +639,9 @@ class CAutopic():
             item = item.replace('）', r')')
         return item
 
-    def get_brac_dict(self, str_eq):
+    @staticmethod
+    def get_brac_dict(str_eq):
+        # 括号占位栈
         brac_dict = {}
         arrs = []
         for i, v in enumerate(str_eq):
@@ -687,8 +674,52 @@ class CAutopic():
                 current_app.logger.error(">>> {} 上传到OSS出错 : {}  <<<".format(msg, e))
                 raise Exception('服务器繁忙，请稍后再试')
 
+    @staticmethod
+    def whichin(text):
+        if "</w:t>" in text:
+            if "</w:instrText" in text:
+                if "</w:drawing>" in text:
+                    return ["<w:t", "</w:t>", "<w:instrText", "</w:instrText>", "<a:blip", ">"]
+                else:
+                    return ["<w:t", "</w:t>", "<w:instrText", "</w:instrText>"]
+            elif "</w:drawing>" in text:
+                return ["<w:t", "</w:t>", "<a:blip", ">"]
+            else:
+                return ["<w:t", "</w:t>"]
+        elif "</w:instrText" in text:
+            if "</w:drawing>" in text:
+                return ["<w:instrText", "</w:instrText>", "<a:blip", ">"]
+            else:
+                return ["<w:instrText", "</w:instrText>"]
+        elif "</w:drawing>" in text:
+            return ["<a:blip", ">"]
+        else:
+            return []
+
+    @staticmethod
+    def random_name(shuffix):
+        myStr = string.ascii_letters + '12345678'
+        res = ''.join(random.choice(myStr) for _ in range(20)) + shuffix
+        return res
+
+    @staticmethod
+    def del_file(filepath):
+        """
+        删除某一目录下的所有文件或文件夹
+        :param filepath: 路径
+        :return:
+        """
+        del_list = os.listdir(filepath)
+        for f in del_list:
+            file_path = os.path.join(filepath, f)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+
+
 if __name__ == '__main__':
     # file1 = '/opt/jinrui/jinrui/img/kexue/高分卷  （一）\A卷答案 高分卷（一）.docx'
     # file1 = 'D:\科学\高分卷  （一）\A卷 高分卷（一）.docx'
     file1 = r'D:\testdocx\数学  推演卷（一） A卷.docx'
-    transfordoc(file1)
+    # transfordoc(file1)

@@ -5,12 +5,13 @@ from datetime import datetime
 from ..config.enums import PngType
 from ..extensions.success_response import Success
 from jinrui.config.secret import ACCESS_KEY_SECRET, ACCESS_KEY_ID, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME
-from jinrui.extensions.register_ext import db
+from jinrui.extensions.register_ext import db, ali_oss
 from ..extensions.params_validates import parameter_required
-from jinrui.extensions.error_response import ErrorFileType, ErrorAnswerType
+from jinrui.extensions.error_response import ErrorFileType, ErrorAnswerType, ParamsError
 from jinrui.models.jinrui import j_manager, j_answer_zip, j_answer_pdf, j_paper, j_answer_sheet, j_answer_png, \
     j_role, j_organization, j_school_network, j_answer_upload
 from flask import current_app, request
+from sqlalchemy import false
 
 class CAnswer():
 
@@ -222,8 +223,88 @@ class CAnswer():
         }
 
     def upload_pdf(self):
-        pass
+        file = request.files.get('file')
+        if not file:
+            raise ParamsError('文件缺失')
+        data = parameter_required()
+        pdf_ip = request.remote_addr
+        pdf_use = data.get('pdfuse')
+        pdf_address = data.get('pdfaddress')
+        pager_name = data.get('pagername')
+        j_answer_pdf.query.filter(
+            j_answer_pdf.pdf_ip == pdf_ip, j_answer_pdf.pdf_use == pdf_use,
+            j_answer_pdf.pdf_address == pdf_address, j_answer_pdf.isdelete == false()).all()
+        if j_answer_pdf:
+            raise ParamsError('该pdf已上传')
+        school = j_school_network.query.filter(
+            j_school_network.net_ip == pdf_ip, j_school_network.isdelete == false()).first_('ip 非法，请联系管理员')
+        pdf_school = school.school_name
+        if not pdf_school:
+            raise ParamsError('学校名丢失，请联系管理员处理')
+        # todo  获取j_paper 的key
+        # sheet_dict_model =
+        pdf_status = '300301'
+        filename = file.filename
+        shuffix = os.path.splitext(pager_name)[-1]
+        current_app.logger.info(">>>  Upload File Shuffix is {0}  <<<".format(shuffix))
+        shuffix = shuffix.lower()
+        if shuffix != 'pdf':
+            raise ParamsError('上传文件需要是pdf')
+
+        img_name = self.random_name(shuffix)
+        time_now = datetime.now()
+        year = str(time_now.year)
+        month = str(time_now.month)
+        day = str(time_now.day)
+        newPath = os.path.join(current_app.config['BASEDIR'], 'img', 'pdf', year, month, day)
+        if not os.path.isdir(newPath):
+            os.makedirs(newPath)
+        newFile = os.path.join(newPath, img_name)
+        # 服务器本地保存
+        file.save(newFile)
+        data = '/img/{folder}/{year}/{month}/{day}/{img_name}'.format(
+            folder='pdf', year=year,month=month, day=day, img_name=img_name)
+        # 上传oss
+        self._upload_to_oss(newFile, data[1:], 'pdf')
+        oss_area = 'https://jinrui.sanbinit.cn'
+        pdf_url = oss_area + data
+        with db.auto_commit():
+            answer_pdf = j_answer_pdf.create({
+                'pdf_id': str(uuid.uuid4()),
+                'pdf_user': pdf_use,
+                'paper_name': pager_name,
+                # 'sheet_dict': sheet_dict,
+                'pdf_status': pdf_status,
+                'pdf_url': pdf_url,
+                'pdf_address': pdf_address,
+                'pdf_ip': pdf_ip,
+                'pdf_school': pdf_school
+            })
+            db.session.add(answer_pdf)
+        return Success('上传成功')
 
     def get_pdf_list(self):
         pass
 
+
+    def _get_pdf_list(self, pdf_ip, pdf_use, pdf_address):
+        j_answer_pdf.query.filter(
+            j_answer_pdf.pdf_ip == pdf_ip, j_answer_pdf.pdf_use == pdf_use,
+            j_answer_pdf.pdf_address == pdf_address, j_answer_pdf.isdelete == false()).all()
+        pass
+
+    @staticmethod
+    def random_name(shuffix):
+        import string, random
+        myStr = string.ascii_letters + '12345678'
+        res = ''.join(random.choice(myStr) for _ in range(20)) + shuffix
+        return res
+
+    def _upload_to_oss(self, file_data,data, msg):
+
+        if current_app.config.get('IMG_TO_OSS'):
+            try:
+                ali_oss.save(data=file_data, filename=data[1:])
+            except Exception as e:
+                current_app.logger.error(">>> {} 上传到OSS出错 : {}  <<<".format(msg, e))
+                raise Exception('服务器繁忙，请稍后再试')
