@@ -242,13 +242,15 @@ class CAnswer():
         if not pdf_school:
             raise ParamsError('学校名丢失，请联系管理员处理')
         # todo  获取j_paper 的key
-        # sheet_dict_model =
+        sheet_dict_model = j_answer_sheet.query.join(j_paper, j_paper.sheet_id == j_answer_sheet.id).filter(
+            j_paper.name == pager_name).first_('试卷已删除')
+        sheet_dict = sheet_dict_model.json
         pdf_status = '300301'
         filename = file.filename
-        shuffix = os.path.splitext(pager_name)[-1]
+        shuffix = os.path.splitext(filename)[-1]
         current_app.logger.info(">>>  Upload File Shuffix is {0}  <<<".format(shuffix))
         shuffix = shuffix.lower()
-        if shuffix != 'pdf':
+        if shuffix != '.pdf':
             raise ParamsError('上传文件需要是pdf')
 
         img_name = self.random_name(shuffix)
@@ -273,7 +275,7 @@ class CAnswer():
                 'pdf_id': str(uuid.uuid4()),
                 'pdf_user': pdf_use,
                 'paper_name': pager_name,
-                # 'sheet_dict': sheet_dict,
+                'sheet_dict': sheet_dict,
                 'pdf_status': pdf_status,
                 'pdf_url': pdf_url,
                 'pdf_address': pdf_address,
@@ -286,12 +288,6 @@ class CAnswer():
     def get_pdf_list(self):
         pass
 
-
-    def _get_pdf_list(self, pdf_ip, pdf_use, pdf_address):
-        j_answer_pdf.query.filter(
-            j_answer_pdf.pdf_ip == pdf_ip, j_answer_pdf.pdf_use == pdf_use,
-            j_answer_pdf.pdf_address == pdf_address, j_answer_pdf.isdelete == false()).all()
-        pass
 
     @staticmethod
     def random_name(shuffix):

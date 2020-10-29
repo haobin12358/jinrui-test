@@ -225,11 +225,12 @@ class CAutopic():
                 else:
                     paper_dict[str(paper_num)] = "<div>" + use_str + "</div>"
             i = i + 1
-        current_app.logger.info(paper_dict)
+        # current_app.logger.info(paper_dict)
         # os.remove(path2)
         os.remove(path3)
         self.del_file(path3 + "_files")
         # os.removedirs(path3+"_files")
+        return paper_dict
 
     @staticmethod
     def get_eqcontent(str_eq, index):
