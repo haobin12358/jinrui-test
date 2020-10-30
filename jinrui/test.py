@@ -97,7 +97,8 @@ class ScanPdf(object):
             shuffix = str(shuffix).lower()
             if shuffix != '.pdf':
                 continue
-
+            if current_path in self.filenamelist:
+                continue
             self.upload_pdf(pdf_use, paper_name, current_path, pdf)
 
     def upload_pdf(self, pdf_use, paper_name, path, pdfname):
