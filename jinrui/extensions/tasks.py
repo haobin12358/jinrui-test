@@ -34,6 +34,7 @@ def cancel_async_task(conn_id):
         current_app.logger.info(f'取消任务成功 task_id:{exist_task_id}')
 
 
+@celery.task(name='auto_setpic')
 def auto_setpic():
     from jinrui.models import j_paper, j_question
     import requests
@@ -41,6 +42,7 @@ def auto_setpic():
     from datetime import datetime
     from ..control.Cautopic import CAutopic
     cp = CAutopic()
+
     def _get_path(fold):
         """获取服务器上文件路径"""
         time_now = datetime.now()
@@ -53,7 +55,7 @@ def auto_setpic():
             os.makedirs(filepath)
         return filepath
 
-    def _get_fetch(path, qiniu=False):
+    def _get_fetch(path):
         # if qiniu:
         #     content = requests.get(MEDIA_HOST + path)
         # else:
@@ -93,7 +95,6 @@ def auto_setpic():
             db.session.add_all(update_list)
     except Exception as e:
         current_app.logger.info('解析试卷失败 {}'.format(e))
-
 
 
 if __name__ == '__main__':
