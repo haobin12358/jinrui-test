@@ -41,7 +41,7 @@ class ScanPdf(object):
         else:
             self.base_dir = r"/tmp/jinrui_tech/"
         self.log = logging.getLogger(__name__)
-        self.log.setLevel(level=logging.ERROR)
+        self.log.setLevel(level=logging.INFO)
         if not os.path.isdir(self.base_dir):
             os.makedirs(self.base_dir)
         handler = logging.FileHandler(os.path.join(self.base_dir, 'log.txt'))
