@@ -5,11 +5,12 @@ import string, random
 from flask import request, current_app
 from sqlalchemy import false
 
+from jinrui.config.secret import ALIOSS_BUCKET_NAME, ALIOSS_ENDPOINT
 from jinrui.extensions.error_response import ParamsError
 from jinrui.extensions.params_validates import parameter_required
 from jinrui.extensions.register_ext import ali_oss, db
 from jinrui.extensions.success_response import Success
-from jinrui.models import j_answer_pdf, j_school_network, j_paper, j_answer_sheet
+from jinrui.models import j_answer_pdf, j_school_network, j_paper, j_answer_sheet, j_answer_upload
 
 
 class CPdfUpload(object):
@@ -24,6 +25,7 @@ class CPdfUpload(object):
         pdf_use = data.get('pdfuse')
         pdf_address = data.get('pdfaddress')
         pager_name = data.get('pagername')
+
         existlist = j_answer_pdf.query.filter(
             j_answer_pdf.pdf_ip == pdf_ip, j_answer_pdf.pdf_use == pdf_use,
             j_answer_pdf.pdf_address == pdf_address, j_answer_pdf.isdelete == false()).all()
@@ -36,8 +38,12 @@ class CPdfUpload(object):
             return ParamsError('学校名丢失，请联系管理员处理')
         # todo  获取j_paper 的key
         sheet_dict_model = j_answer_sheet.query.join(j_paper, j_paper.sheet_id == j_answer_sheet.id).filter(
-            j_paper.name == pager_name).first_('试卷已删除')
-        sheet_dict = sheet_dict_model.json
+            j_paper.name == pager_name, j_paper.type == 'A').first()
+        if sheet_dict_model:
+
+            sheet_dict = sheet_dict_model.json
+        else:
+            sheet_dict = ''
         pdf_status = '300301'
         filename = file.filename
         shuffix = os.path.splitext(filename)[-1]
@@ -61,21 +67,45 @@ class CPdfUpload(object):
             folder='pdf', year=year,month=month, day=day, img_name=img_name)
         # 上传oss
         self._upload_to_oss(newFile, data[1:], 'pdf')
-        oss_area = 'https://jinrui.sanbinit.cn'
+        oss_area = 'https://{}.{}'.format(ALIOSS_BUCKET_NAME, ALIOSS_ENDPOINT)
         pdf_url = oss_area + data
+        existupload = j_answer_pdf.query.filter(
+            j_answer_pdf.isdelete == false(),
+            j_answer_pdf.pdf_ip == pdf_ip,
+            j_answer_pdf.pdf_use == pdf_use,
+            j_answer_pdf.paper_name == pager_name).first()
+        if existupload:
+            upload_id = existupload.upload_id
+        else:
+            upload_id = str(uuid.uuid4())
         with db.auto_commit():
-            answer_pdf = j_answer_pdf.create({
+            pdf_dict = {
                 'pdf_id': str(uuid.uuid4()),
-                'pdf_user': pdf_use,
+                'pdf_use': pdf_use,
                 'paper_name': pager_name,
                 'sheet_dict': sheet_dict,
                 'pdf_status': pdf_status,
                 'pdf_url': pdf_url,
                 'pdf_address': pdf_address,
                 'pdf_ip': pdf_ip,
+                'upload_id': upload_id,
                 'pdf_school': pdf_school
-            })
+            }
+            current_app.logger.info("get pdf {}".format(pdf_dict))
+            answer_pdf = j_answer_pdf.create(pdf_dict)
+            existupload = j_answer_upload.query.filter(
+                j_answer_upload.is_delete == false(), j_answer_upload.id == upload_id).first()
+            if not existupload:
+                upload = j_answer_upload.create({
+                    'id': upload_id,
+                    'upload_by': pdf_school,
+                    'status': '处理中',
+                    'url': pdf_url
+                })
+                db.session.add(upload)
             db.session.add(answer_pdf)
+
+        current_app.logger.info('success')
         return Success('上传成功')
 
     def get_pdf_list(self):
@@ -89,11 +119,12 @@ class CPdfUpload(object):
         res = ''.join(random.choice(myStr) for _ in range(20)) + shuffix
         return res
 
-    def _upload_to_oss(self, file_data,data, msg):
+    def _upload_to_oss(self, file_data, data, msg):
 
         if current_app.config.get('IMG_TO_OSS'):
             try:
-                ali_oss.save(data=file_data, filename=data[1:])
+                ali_oss.save(data=file_data, filename=data)
+                current_app.logger.info('上传oss 成功 path = {}'.format(data))
             except Exception as e:
                 current_app.logger.error(">>> {} 上传到OSS出错 : {}  <<<".format(msg, e))
                 raise Exception('服务器繁忙，请稍后再试')
