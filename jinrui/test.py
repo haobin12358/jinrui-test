@@ -32,7 +32,7 @@ schedule = sched.scheduler(time.time, time.sleep)
 
 class ScanPdf(object):
     def __init__(self):
-        self.url = 'https://jinrui.sanbinit.cn/api/answer/upload_pdf'
+        self.url = 'https://jinrui.sanbinit.cn/api/pdf/upload_pdf'
         if platform.system() == "Windows":
             self.base_dir = r"C:\jinrui_tech\\"
         else:
