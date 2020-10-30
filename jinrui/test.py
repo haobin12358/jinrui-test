@@ -111,19 +111,22 @@ class ScanPdf(object):
             'pagername': paper_name,
         }
         try:
-            response = requests.post(self.url, data, files=files)
+            response = requests.post(self.url, files=files, params=data)
             json_response = json.loads(response.content)
-            if int(json_response.get('code', 0)) != 200:
+            if int(json_response.get('status', 0)) == 200:
+                self.log.info('文件上传成功 {}'.format(json_response.get('message')))
+            if int(json_response.get('code', 0)) == 200:
                 self.log.error('文件上传失败 {}'.format(json_response.get('message')))
 
         except Exception as e:
             self.log.error('文件上传失败 {}'.format(e))
         finally:
-            # 记录文件名到配置文件
-            self.cf.add_selection(path)
+            if not self.cf.cf.has_section(path):
+                # 记录文件名到配置文件
+                self.cf.add_selection(path)
+                # 全局变量添加文件名
+                self.filenamelist.append(path)
             self.log.info('文件上传完成')
-            # 全局变量添加文件名
-            self.filenamelist.append(path)
 
 
 class ConfigSettings(object):
@@ -156,6 +159,9 @@ def main(inc=60):
     schedule.run()
 
 
+# sp = ScanPdf()
+# path = r'D:\teamsystem\jinrui-test\img\pdf\2020\10\30\DmU5LJ5GiH7oiWq4rGlL.pdf'
+# sp.upload_pdf('0', 'test', path, 'DmU5LJ5GiH7oiWq4rGlL.pdf')
 main()
 # local test
 # base_bath = os.getcwd()
