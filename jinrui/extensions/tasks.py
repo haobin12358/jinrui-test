@@ -40,7 +40,7 @@ def auto_setpic():
     import requests
     import os
     from datetime import datetime
-    from ..control.Cautopic import CAutopic
+    from jinrui.control.Cautopic import CAutopic
     cp = CAutopic()
 
     def _get_path(fold):
@@ -60,10 +60,9 @@ def auto_setpic():
         #     content = requests.get(MEDIA_HOST + path)
         # else:
         content = requests.get(path)
-
-        filename = cp.random_name('.pdf')
-
-        filepath = _get_path('pdf')
+        shuffix = os.path.splitext(path)[-1]
+        filename = cp.random_name(shuffix)
+        filepath = _get_path('doc')
         # filedbname = os.path.join(filedbpath, filename)
         filename = os.path.join(filepath, filename)
         with open(filename, 'wb') as head:
@@ -71,7 +70,7 @@ def auto_setpic():
         return filename
 
     jplist = j_paper.query.filter(j_paper.encode_tag == '0').all()
-
+    current_app.logger.info('get jplist {}'.format(len(jplist)))
     try:
         with db.auto_commit():
             update_list = []
@@ -79,12 +78,15 @@ def auto_setpic():
                 paper_dict = {}
                 answer_dict = {}
                 if jp.doc_url:
+                    current_app.logger.info('jp doc {}'.format(jp.doc_url))
                     doc_path = _get_fetch(jp.doc_url)
                     paper_dict = cp.transfordoc(doc_path)
-
+                    current_app.logger.info('jp doc over')
                 if jp.answer_doc_url:
+                    current_app.logger.info('jp answer {}'.format(jp.answer_doc_url))
                     answer_path = _get_fetch(jp.answer_doc_url)
                     answer_dict = cp.transfordoc(answer_path)
+                    current_app.logger.info('jp answer over')
                 for paper_num in paper_dict:
                     question = j_question.query.filter(
                         j_question.paper_id == jp.id, j_question.question_number == paper_num).first()
@@ -92,6 +94,8 @@ def auto_setpic():
                         continue
                     question.update({'content': paper_dict.get(paper_num), 'answer': answer_dict.get(paper_num)})
                     update_list.append(question)
+                jp.encode_tag = '1'
+                update_list.append(jp)
             db.session.add_all(update_list)
     except Exception as e:
         current_app.logger.info('解析试卷失败 {}'.format(e))
@@ -101,3 +105,5 @@ if __name__ == '__main__':
     from jinrui import create_app
 
     app = create_app()
+    with app.app_context():
+        auto_setpic()

@@ -32,12 +32,9 @@ schedule = sched.scheduler(time.time, time.sleep)
 
 class ScanPdf(object):
     def __init__(self):
-
-        self.filenamelist = self.cf.sections()
-
         self.url = 'https://jinrui.sanbinit.cn/api/answer/upload_pdf'
         if platform.system() == "Windows":
-            self.base_dir = r"D:\jinrui_tech\\"
+            self.base_dir = r"C:\jinrui_tech\\"
         else:
             self.base_dir = r"/tmp/jinrui_tech/"
         self.log = logging.getLogger(__name__)
@@ -54,11 +51,14 @@ class ScanPdf(object):
             fd = open(cfg_path, mode="w", encoding="utf-8")
             fd.close()
         self.cf = ConfigSettings()
+        self.filenamelist = self.cf.sections()
+        self.log.info('start')
 
     def scan_dir(self, inc):
         # 扫描基础目录 获取pdf类型
 
         pdf_use_list = os.listdir(self.base_dir)
+        self.log.info('get base dir {}'.format(len(pdf_use_list)))
 
         for pdf_use_dir in pdf_use_list:
             current_path = os.path.join(self.base_dir, pdf_use_dir)

@@ -21,12 +21,16 @@ from jinrui.extensions.register_ext import ali_oss
 class CAutopic():
 
     def transfordoc(self, filepath):
+        current_app.logger.info('get path {}'.format(filepath))
         path = filepath
-        new_tmp_name = self.random_name('.docx')
+        oss_domain = 'https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com'
+        shuffix = os.path.splitext(filepath)[-1]
+        new_tmp_name = self.random_name(shuffix)
         path2 = os.path.join(os.path.dirname(filepath), new_tmp_name)
         path3 = os.path.join(os.path.dirname(filepath), '.'.join(new_tmp_name.split('.')[:-1]) + '.zip')
         shutil.copyfile(path, path2)
         os.rename(path2, path3)
+        current_app.logger.info('get path3 {}'.format(path3))
         zip_file = zipfile.ZipFile(path3)
         if os.path.isdir(path3 + "_files"):
             pass
@@ -142,6 +146,7 @@ class CAutopic():
                             current_app.logger.info(">>>>>>>>>>target_list_dict:" + str(target_list_dict))
                             picture_path = path3 + "_files\\word" + "\\" + target_list_dict[0] + "\\" + \
                                            target_list_dict[1]
+                            url_response = self.upload_to_oss(picture_path)
                             # files = {
                             #     "file": (target_list_dict[1], open(r"{0}".format(picture_path), "rb"), "image/png")
                             # }
@@ -149,8 +154,8 @@ class CAutopic():
                             # json_response = json.loads(response.content)
                             # url_response = json_response["data"]["url"]
                             # print(">>>>>>>>>>>>>>>>>>url_response:" + str(url_response))
-                            # use_str = use_str.replace("""<a:blip r:embed="{0}"/>""".format(rId),
-                            #                           "<img src='{0}'></img>".format(url_response))
+                            use_str = use_str.replace("""<a:blip r:embed="{0}"/>""".format(rId),
+                                                      "<img src='{0}'></img>".format(oss_domain + url_response))
                         else:
                             use_str = use_str.replace("""<a:blip r:embed="{0}"/>""".format(rId),
                                                       "<img src='{0}'></img>".format(
@@ -180,7 +185,7 @@ class CAutopic():
                         os.makedirs(newPath)
                     newFile = os.path.join(newPath, img_name)
                     self.draw_pic(tmp_use_str, newFile, eq_index)
-                    db_path = 'https://jinrui.sanbinit.cn/img/{folder}/{year}/{month}/{day}/{img_name}'.format(
+                    db_path = '{domain}/img/{folder}/{year}/{month}/{day}/{img_name}'.format(domain=oss_domain,
                         folder='tmp', year=year, month=month, day=day, img_name=img_name)
                     # new_eq_str = "<img src='{0}'></img>".format(db_path)
                     img_eq = Image.open(newFile)
@@ -527,7 +532,7 @@ class CAutopic():
 
             # 画基图
             img_base = Image.new('RGB', (1200, 1200), 'white')
-            font_normal = imf.truetype(os.path.join('./', 'PingFang Medium_downcc.otf'), font_size.get(len(new_list)))
+            font_normal = imf.truetype(os.path.join(current_app.config['BASEDIR'], 'jinrui', 'PingFang Medium_downcc.otf'), font_size.get(len(new_list)))
             dw = imd.Draw(img_base)
             x, y = 0, 0
             dw.text((x, y), '{', font=font_normal, fill='#000000')
@@ -645,7 +650,7 @@ class CAutopic():
     @staticmethod
     def upload_to_oss(file_data, msg=''):
         # todo 先测试 再上传oss
-        return
+        # return
         time_now = datetime.now()
         year = str(time_now.year)
         month = str(time_now.month)
@@ -660,6 +665,7 @@ class CAutopic():
             except Exception as e:
                 current_app.logger.error(">>> {} 上传到OSS出错 : {}  <<<".format(msg, e))
                 raise Exception('服务器繁忙，请稍后再试')
+        return data
 
     @staticmethod
     def whichin(text):
@@ -703,3 +709,12 @@ class CAutopic():
                 os.remove(file_path)
             elif os.path.isdir(file_path):
                 shutil.rmtree(file_path)
+
+# from jinrui import create_app
+# app = create_app()
+# with app.app_context():
+#     # doc_path = r'D:\testdocx\数学  推演卷（一） A卷.docx'
+#     doc_path = r'D:\teamsystem\jinrui-test\img\doc\2020\10\30\LMbKgJKutaAb5pZtpACz.docx'
+#     cp = CAutopic()
+#     papger = cp.transfordoc(doc_path)
+#     print(papger)
