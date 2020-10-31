@@ -154,8 +154,9 @@ class j_answer_png(Base):
     student_no = Column(String(20), comment="学生考号")
     student_name = Column(String(255), comment="学生姓名")
     school = Column(String(255), comment="学校名称")
-    result_score = Column(Integer, comment="考卷分数")
-    result_update = Column(Integer, comment="考卷分数订正")
+    result_score = Column(Integer, comment="考卷分数", default=0)
+    result_update = Column(Integer, comment="考卷分数订正", default=0)
+    score_id = Column(String(64), comment="答题id")
 
 class j_answer_upload(Base):
     """

@@ -168,6 +168,7 @@ if __name__ == "__main__":
             .replace("</w:tr>", "</tr>")\
             .replace("</w:tbl>", "</table>")
         print(use_str)
+
         point_use = "．"  # 用来区分题目的点位
         # point_use = "."
         # 题目标号
