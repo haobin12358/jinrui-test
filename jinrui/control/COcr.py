@@ -2,12 +2,12 @@
 import os, uuid, oss2, shutil, json, cv2, fitz, platform, requests
 from datetime import datetime
 
-from ..config.enums import TestEnum
 from ..extensions.success_response import Success
 from jinrui.config.secret import ACCESS_KEY_SECRET, ACCESS_KEY_ID, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME
 from jinrui.extensions.register_ext import db
 from ..extensions.params_validates import parameter_required
-from jinrui.models.jinrui import j_question, j_answer_pdf, j_answer_png, j_student, j_organization, j_school_network
+from jinrui.models.jinrui import j_question, j_answer_pdf, j_answer_png, j_student, j_organization, j_school_network, \
+    j_answer_zip, j_paper, j_score, j_answer_booklet, j_answer_upload
 from flask import current_app
 
 class COcr():
@@ -46,20 +46,26 @@ class COcr():
         return Success(data=data)
 
     def deal_pdf(self):
+        # 比对正确答案处理分数
+        # 处理异常情况（异常试卷和异常返回值）
+        # 整体流程测试
         pdf = j_answer_pdf.query.filter(j_answer_pdf.isdelete == 0, j_answer_pdf.pdf_status == "300301")\
             .order_by(j_answer_pdf.createtime.desc()).first()
         if pdf and pdf.pdf_ip:
             school_network = j_school_network.query.filter(j_school_network.net_ip == pdf.pdf_ip).first()
             if school_network:
-                school_name = None
-            else:
                 school_name = school_network.school_name
+            else:
+                school_name = pdf.pdf_school
+            print(">>>>>>>>>>>>>>>>>>school_name:" + str(school_name))
             organization = j_organization.query.filter(j_organization.name == school_name,
                                                        j_organization.role_type == "SCHOOL").first()
             org_id = organization.id
             # 组织list，用于判断学生的组织id是否在其中，从而判断学生对应信息
             children_id_list = self._get_all_org_behind_id(org_id)
+            print(">>>>>>>>>>>>>>>>>children_id:" + str(children_id_list))
 
+            upload_id = pdf.upload_id
             pdf_url = pdf.pdf_url
             pdf_uuid = str(uuid.uuid1())
             # 创建pdf存储路径
@@ -191,26 +197,182 @@ class COcr():
                             png_instance = j_answer_png.create(sn_dict)
                             db.session.add(png_instance)
 
-                        for sheet in json.loads(pdf.sheet_dict):
-                            # jpg路径
-                            # jpg_path = pdf_path + jpg_dict[sheet["page"] - 1]
-                            if sheet["type"] == "select":
-                                select_list = self._cut_select(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
-                                with db.auto_commit():
-                                    for select in select_list:
-                                        score_id = str(uuid.uuid1())
+                        if pdf.pdf_address == "zip":
+                            zip_id = pdf.zip_id
+                            zip_file = j_answer_zip.query.filter(j_answer_zip.zip_id == zip_id).first()
+                            upload_by = zip_file.zip_upload_user
+                        else:
+                            upload_by = pdf.pdf_school
+
+                        paper = j_paper.query.filter(j_paper.id == sn).first()
+                        if paper:
+                            paper_id = sn
+                        else:
+                            paper_id = None
+                        # 封装某个学生的某套答卷dict
+                        booklet_dict = {
+                            "id": booklet_id,
+                            "paper_id": paper_id,
+                            "student_id": student_id,
+                            "status": "1",
+                            "url": pdf.pdf_url,
+                            "upload_by": upload_by,
+                            "upload_id": upload_id
+                        }
+                        if student_id and paper_id:
+                            for sheet in json.loads(pdf.sheet_dict):
+                                # jpg路径
+                                # jpg_path = pdf_path + jpg_dict[sheet["page"] - 1]
+                                if sheet["type"] == "select":
+                                    select_list = self._cut_select(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
+                                    with db.auto_commit():
+                                        for select in select_list:
+                                            question_number = select["question_number"]
+                                            question = j_question.query.filter(j_question.paper_id == paper_id,
+                                                                               j_question.question_number == str(question_number))\
+                                                .first()
+                                            score_id = str(uuid.uuid1())
+                                            score_dict = {
+                                                "id": score_id,
+                                                "student_id": student_id,
+                                                "booklet_id": booklet_id,
+                                                "question_id": question.id,
+                                                "grade_by": "system-ocr",
+                                                "question_number": question_number,
+                                                "score": 0,
+                                                "question_url": select.get("png_url"),
+                                                "status": "304"
+                                            }
+                                            select_dict = {
+                                                "isdelete": 0,
+                                                "createtime": datetime.now(),
+                                                "updatetime": datetime.now(),
+                                                "png_id": str(uuid.uuid1()),
+                                                "png_url": select.get("png_url"),
+                                                "pdf_id": pdf.pdf_id,
+                                                "png_result": select.get("png_result"),
+                                                "png_status": select.get("png_status"),
+                                                "png_type": select.get("png_type"),
+                                                "booklet_id": booklet_id,
+                                                "page_url": jpg_oss_list[sheet["page"] - 1],
+                                                "student_no": no,
+                                                "student_name": student_name,
+                                                "school": school_name,
+                                                "result_score": 0,
+                                                "result_update": 0,
+                                                "score_id": score_id
+                                            }
+                                            select_instance = j_answer_png.create(select_dict)
+                                            db.session.add(select_instance)
+                                            score_instance = j_score.create(score_dict)
+                                            db.session.add(score_instance)
+                                elif sheet["type"] == "multi":
+                                    multi_list = self._cut_multi(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
+                                    with db.auto_commit():
+                                        for select in multi_list:
+                                            question_number = select["question_number"]
+                                            question = j_question.query.filter(j_question.paper_id == paper_id,
+                                                                               j_question.question_number == str(
+                                                                                   question_number)) \
+                                                .first()
+                                            score_id = str(uuid.uuid1())
+                                            score_dict = {
+                                                "id": score_id,
+                                                "student_id": student_id,
+                                                "booklet_id": booklet_id,
+                                                "question_id": question.id,
+                                                "grade_by": "system-ocr",
+                                                "question_number": question_number,
+                                                "score": 0,
+                                                "question_url": select.get("png_url"),
+                                                "status": "304"
+                                            }
+                                            select_dict = {
+                                                "isdelete": 0,
+                                                "createtime": datetime.now(),
+                                                "updatetime": datetime.now(),
+                                                "png_id": str(uuid.uuid1()),
+                                                "png_url": select.get("png_url"),
+                                                "pdf_id": pdf.pdf_id,
+                                                "png_result": select.get("png_result"),
+                                                "png_status": select.get("png_status"),
+                                                "png_type": select.get("png_type"),
+                                                "booklet_id": booklet_id,
+                                                "page_url": jpg_oss_list[sheet["page"] - 1],
+                                                "student_no": no,
+                                                "student_name": student_name,
+                                                "school": school_name,
+                                                "result_score": 0,
+                                                "result_update": 0,
+                                                "score_id": score_id
+                                            }
+                                            select_instance = j_answer_png.create(select_dict)
+                                            db.session.add(select_instance)
+                                            score_instance = j_score.create(score_dict)
+                                            db.session.add(score_instance)
+                                elif sheet["type"] == "judge":
+                                    judge_list = self._cut_judge(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
+                                    with db.auto_commit():
+                                        for select in judge_list:
+                                            question_number = select["question_number"]
+                                            question = j_question.query.filter(j_question.paper_id == paper_id,
+                                                                               j_question.question_number == str(
+                                                                                   question_number)) \
+                                                .first()
+                                            score_id = str(uuid.uuid1())
+                                            score_dict = {
+                                                "id": score_id,
+                                                "student_id": student_id,
+                                                "booklet_id": booklet_id,
+                                                "question_id": question.id,
+                                                "grade_by": "system-ocr",
+                                                "question_number": question_number,
+                                                "score": 0,
+                                                "question_url": select.get("png_url"),
+                                                "status": "304"
+                                            }
+                                            select_dict = {
+                                                "isdelete": 0,
+                                                "createtime": datetime.now(),
+                                                "updatetime": datetime.now(),
+                                                "png_id": str(uuid.uuid1()),
+                                                "png_url": select.get("png_url"),
+                                                "pdf_id": pdf.pdf_id,
+                                                "png_result": select.get("png_result"),
+                                                "png_status": select.get("png_status"),
+                                                "png_type": select.get("png_type"),
+                                                "booklet_id": booklet_id,
+                                                "page_url": jpg_oss_list[sheet["page"] - 1],
+                                                "student_no": no,
+                                                "student_name": student_name,
+                                                "school": school_name,
+                                                "result_score": 0,
+                                                "result_update": 0,
+                                                "score_id": score_id
+                                            }
+                                            select_instance = j_answer_png.create(select_dict)
+                                            db.session.add(select_instance)
+                                            score_instance = j_score.create(score_dict)
+                                            db.session.add(score_instance)
+                                elif sheet["type"] == "fill":
+                                    score_id = str(uuid.uuid1())
+                                    question_number = sheet["start"]
+                                    question = j_question.query.filter(j_question.paper_id == paper_id,
+                                                                       j_question.question_number == str(
+                                                                           question_number)) \
+                                        .first()
+                                    if pdf.pdf_use == "300201":
+                                        fill_dict_ocr = self._cut_fill_ocr(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
+                                        fill_dict = self._cut_fill_all(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
                                         score_dict = {
                                             "id": score_id,
                                             "student_id": student_id,
                                             "booklet_id": booklet_id,
-                                            "question_id": None,
+                                            "question_id": question.id,
                                             "grade_by": "system-ocr",
-                                            "create_time": datetime.now(),
-                                            "update_time": datetime.now(),
-                                            "question_number": None,
+                                            "question_number": question_number,
                                             "score": 0,
-                                            "question_url": None,
-                                            "answer": None,
+                                            "question_url": fill_dict.get("png_url"),
                                             "status": "304"
                                         }
                                         select_dict = {
@@ -218,11 +380,11 @@ class COcr():
                                             "createtime": datetime.now(),
                                             "updatetime": datetime.now(),
                                             "png_id": str(uuid.uuid1()),
-                                            "png_url": select.get("png_url"),
+                                            "png_url": fill_dict_ocr.get("png_url"),
                                             "pdf_id": pdf.pdf_id,
-                                            "png_result": select.get("png_result"),
-                                            "png_status": select.get("png_status"),
-                                            "png_type": select.get("png_type"),
+                                            "png_result": fill_dict_ocr.get("png_result"),
+                                            "png_status": fill_dict_ocr.get("png_status"),
+                                            "png_type": fill_dict_ocr.get("png_type"),
                                             "booklet_id": booklet_id,
                                             "page_url": jpg_oss_list[sheet["page"] - 1],
                                             "student_no": no,
@@ -232,111 +394,101 @@ class COcr():
                                             "result_update": 0,
                                             "score_id": score_id
                                         }
-                                        select_instance = j_answer_png.create(select_dict)
-                                        db.session.add(select_instance)
-                            elif sheet["type"] == "multi":
-                                multi_list = self._cut_multi(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
-                                with db.auto_commit():
-                                    for select in multi_list:
-                                        score_id = str(uuid.uuid1())
-                                        select_dict = {
-                                            "isdelete": 0,
-                                            "createtime": datetime.now(),
-                                            "updatetime": datetime.now(),
-                                            "png_id": str(uuid.uuid1()),
-                                            "png_url": select.get("png_url"),
-                                            "pdf_id": pdf.pdf_id,
-                                            "png_result": select.get("png_result"),
-                                            "png_status": select.get("png_status"),
-                                            "png_type": select.get("png_type"),
+                                    else:
+                                        fill_dict = self._cut_fill_all(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
+                                        score_dict = {
+                                            "id": score_id,
+                                            "student_id": student_id,
                                             "booklet_id": booklet_id,
-                                            "page_url": jpg_oss_list[sheet["page"] - 1],
-                                            "student_no": no,
-                                            "student_name": student_name,
-                                            "school": school_name,
-                                            "result_score": 0,
-                                            "result_update": 0,
-                                            "score_id": score_id
+                                            "question_id": question.id,
+                                            "grade_by": "system-ocr",
+                                            "question_number": question_number,
+                                            "score": 0,
+                                            "question_url": fill_dict.get("png_url"),
+                                            "status": "302"
                                         }
-                                        select_instance = j_answer_png.create(select_dict)
-                                        db.session.add(select_instance)
-                            elif sheet["type"] == "judge":
-                                judge_list = self._cut_judge(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
-                                with db.auto_commit():
-                                    for select in judge_list:
-                                        score_id = str(uuid.uuid1())
-                                        select_dict = {
-                                            "isdelete": 0,
-                                            "createtime": datetime.now(),
-                                            "updatetime": datetime.now(),
-                                            "png_id": str(uuid.uuid1()),
-                                            "png_url": select.get("png_url"),
-                                            "pdf_id": pdf.pdf_id,
-                                            "png_result": select.get("png_result"),
-                                            "png_status": select.get("png_status"),
-                                            "png_type": select.get("png_type"),
-                                            "booklet_id": booklet_id,
-                                            "page_url": jpg_oss_list[sheet["page"] - 1],
-                                            "student_no": no,
-                                            "student_name": student_name,
-                                            "school": school_name,
-                                            "result_score": 0,
-                                            "result_update": 0,
-                                            "score_id": score_id
-                                        }
-                                        select_instance = j_answer_png.create(select_dict)
-                                        db.session.add(select_instance)
-                            elif sheet["type"] == "fill":
-                                fill_dict = self._cut_fill_ocr(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
-                                with db.auto_commit():
+                                        select_dict = None
+                                    with db.auto_commit():
+                                        if select_dict:
+                                            select_instance = j_answer_png.create(select_dict)
+                                            db.session.add(select_instance)
+                                        score_instance = j_score.create(score_dict)
+                                        db.session.add(score_instance)
+                                elif sheet["type"] == "answer":
                                     score_id = str(uuid.uuid1())
-                                    select_dict = {
-                                        "isdelete": 0,
-                                        "createtime": datetime.now(),
-                                        "updatetime": datetime.now(),
-                                        "png_id": str(uuid.uuid1()),
-                                        "png_url": fill_dict.get("png_url"),
-                                        "pdf_id": pdf.pdf_id,
-                                        "png_result": fill_dict.get("png_result"),
-                                        "png_status": fill_dict.get("png_status"),
-                                        "png_type": fill_dict.get("png_type"),
-                                        "booklet_id": booklet_id,
-                                        "page_url": jpg_oss_list[sheet["page"] - 1],
-                                        "student_no": no,
-                                        "student_name": student_name,
-                                        "school": school_name,
-                                        "result_score": 0,
-                                        "result_update": 0,
-                                        "score_id": score_id
-                                    }
-                                    select_instance = j_answer_png.create(select_dict)
-                                    db.session.add(select_instance)
-                            elif sheet["type"] == "answer":
-                                answer_dict = self._cut_answer_ocr(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
-                                with db.auto_commit():
-                                    score_id = str(uuid.uuid1())
-                                    select_dict = {
-                                        "isdelete": 0,
-                                        "createtime": datetime.now(),
-                                        "updatetime": datetime.now(),
-                                        "png_id": str(uuid.uuid1()),
-                                        "png_url": answer_dict.get("png_url"),
-                                        "pdf_id": pdf.pdf_id,
-                                        "png_result": answer_dict.get("png_result"),
-                                        "png_status": answer_dict.get("png_status"),
-                                        "png_type": answer_dict.get("png_type"),
-                                        "booklet_id": booklet_id,
-                                        "page_url": jpg_oss_list[sheet["page"] - 1],
-                                        "student_no": no,
-                                        "student_name": student_name,
-                                        "school": school_name,
-                                        "result_score": 0,
-                                        "result_update": 0,
-                                        "score_id": score_id
-                                    }
-                                    select_instance = j_answer_png.create(select_dict)
-                                    db.session.add(select_instance)
+                                    question_number = sheet["start"]
+                                    question = j_question.query.filter(j_question.paper_id == paper_id,
+                                                                       j_question.question_number == str(
+                                                                           question_number)) \
+                                        .first()
 
+                                    answer_dict_ocr = self._cut_answer_ocr(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
+                                    answer_dict = self._cut_answer_all(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
+                                    if pdf.pdf_use == "300201":
+                                        score_dict = {
+                                            "id": score_id,
+                                            "student_id": student_id,
+                                            "booklet_id": booklet_id,
+                                            "question_id": question.id,
+                                            "grade_by": "system-ocr",
+                                            "question_number": question_number,
+                                            "score": 0,
+                                            "question_url": answer_dict.get("png_url"),
+                                            "status": "304"
+                                        }
+                                        select_dict = {
+                                            "isdelete": 0,
+                                            "createtime": datetime.now(),
+                                            "updatetime": datetime.now(),
+                                            "png_id": str(uuid.uuid1()),
+                                            "png_url": answer_dict_ocr.get("png_url"),
+                                            "pdf_id": pdf.pdf_id,
+                                            "png_result": answer_dict_ocr.get("png_result"),
+                                            "png_status": answer_dict_ocr.get("png_status"),
+                                            "png_type": answer_dict_ocr.get("png_type"),
+                                            "booklet_id": booklet_id,
+                                            "page_url": jpg_oss_list[sheet["page"] - 1],
+                                            "student_no": no,
+                                            "student_name": student_name,
+                                            "school": school_name,
+                                            "result_score": 0,
+                                            "result_update": 0,
+                                            "score_id": score_id
+                                        }
+                                    else:
+                                        score_dict = {
+                                            "id": score_id,
+                                            "student_id": student_id,
+                                            "booklet_id": booklet_id,
+                                            "question_id": question.id,
+                                            "grade_by": "system-ocr",
+                                            "question_number": question_number,
+                                            "score": 0,
+                                            "question_url": answer_dict.get("png_url"),
+                                            "status": "302"
+                                        }
+                                        select_dict = None
+                                    with db.auto_commit():
+                                        if select_dict:
+                                            select_instance = j_answer_png.create(select_dict)
+                                            db.session.add(select_instance)
+                                        score_instance = j_score.create(score_dict)
+                                        db.session.add(score_instance)
+
+                            with db.auto_commit():
+                                booklet_instance = j_answer_booklet.create(booklet_dict)
+                                db.session.add(booklet_instance)
+                                pdf_instance = pdf.update({
+                                    "pdf_status": "300302"
+                                }, null="not")
+                                db.session.add(pdf_instance)
+                                pdf_error_status = j_answer_pdf.query.filter(j_answer_pdf.upload_id == upload_id, j_answer_pdf.pdf_status.in_(["300301", "300303", "300304"])).all()
+                                if not pdf_error_status:
+                                    upload = j_answer_upload.query.filter(j_answer_upload.id == upload_id).first()
+                                    upload_instance = upload.update({
+                                        "status": "待分配"
+                                    })
+                                    db.session.add(upload_instance)
                         jpg_index = jpg_index + 4
 
                 shutil.rmtree(pdf_path)
@@ -649,7 +801,7 @@ class COcr():
             j = j + 1
         return select_list
 
-    def cut_fill_all(self, path, jpg, sheet):
+    def _cut_fill_all(self, path, jpg, sheet):
         """
         全量剪裁填空
         """
@@ -807,7 +959,7 @@ class COcr():
         for org in org_list:
             class_list = j_organization.query.filter(j_organization.parent_org_id == org).all()
             for class_id in class_list:
-                org_list.append(class_id)
+                org_list.append(class_id.id)
 
         org_list.append(org_id)
         return org_list
