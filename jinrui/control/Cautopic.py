@@ -19,19 +19,26 @@ from jinrui.extensions.register_ext import ali_oss
 
 
 class CAutopic():
-
+    oss_domain = 'https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com'
     def transfordoc(self, filepath):
         current_app.logger.info('get path {}'.format(filepath))
         path = filepath
-        oss_domain = 'https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com'
+
         shuffix = os.path.splitext(filepath)[-1]
+        if shuffix != '.docx':
+            return {}
         new_tmp_name = self.random_name(shuffix)
         path2 = os.path.join(os.path.dirname(filepath), new_tmp_name)
         path3 = os.path.join(os.path.dirname(filepath), '.'.join(new_tmp_name.split('.')[:-1]) + '.zip')
         shutil.copyfile(path, path2)
         os.rename(path2, path3)
         current_app.logger.info('get path3 {}'.format(path3))
-        zip_file = zipfile.ZipFile(path3)
+        try:
+            zip_file = zipfile.ZipFile(path3)
+        except Exception as e:
+            current_app.logger.info('解析docx 失败 {}'.format(e))
+            return {}
+
         if os.path.isdir(path3 + "_files"):
             pass
         else:
@@ -137,29 +144,16 @@ class CAutopic():
             # 处理图片
             if "<a:blip" in use_str:
                 for rId in rId_list:
-
+                    """<a:blip r:embed="rId5" cstate="print">"""
                     if """<a:blip r:embed="{0}"/>""".format(rId) in use_str:
-                        target_list_dict = target_list[rId_list.index(rId)].split("/")
-                        current_app.logger.info(use_str)
-                        current_app.logger.info(">>>>>>>>>>>target_dict:" + str(target_list_dict))
-                        if len(target_list_dict) > 1:
-                            current_app.logger.info(">>>>>>>>>>target_list_dict:" + str(target_list_dict))
-                            picture_path = path3 + "_files\\word" + "\\" + target_list_dict[0] + "\\" + \
-                                           target_list_dict[1]
-                            url_response = self.upload_to_oss(picture_path)
-                            # files = {
-                            #     "file": (target_list_dict[1], open(r"{0}".format(picture_path), "rb"), "image/png")
-                            # }
-                            # response = requests.post(headers=header, files=files, url=url)
-                            # json_response = json.loads(response.content)
-                            # url_response = json_response["data"]["url"]
-                            # print(">>>>>>>>>>>>>>>>>>url_response:" + str(url_response))
-                            use_str = use_str.replace("""<a:blip r:embed="{0}"/>""".format(rId),
-                                                      "<img src='{0}'></img>".format(oss_domain + url_response))
-                        else:
-                            use_str = use_str.replace("""<a:blip r:embed="{0}"/>""".format(rId),
-                                                      "<img src='{0}'></img>".format(
-                                                          str(target_list[rId_list.index(rId)])))
+                        match_str = """<a:blip r:embed="{0}"/>""".format(rId)
+                        use_str = self.replace_img(target_list, rId_list, rId, use_str, path3, match_str)
+                    elif """<a:blip r:embed="{0}">""".format(rId) in use_str:
+                        match_str = """<a:blip r:embed="{0}">""".format(rId)
+                        use_str = self.replace_img(target_list, rId_list, rId, use_str, path3, match_str)
+                    elif """<a:blip r:embed="{0}" cstate="print">""".format(rId) in use_str:
+                        match_str = """<a:blip r:embed="{0}" cstate="print">""".format(rId)
+                        use_str = self.replace_img(target_list, rId_list, rId, use_str, path3, match_str)
             # 用于临时处理eq域可先注释掉
             use_str = use_str.replace("<w:instrText>", "").replace("</w:instrText>", "") \
                 .replace("""<w:instrText xml:space="preserve">""", "")
@@ -185,7 +179,7 @@ class CAutopic():
                         os.makedirs(newPath)
                     newFile = os.path.join(newPath, img_name)
                     self.draw_pic(tmp_use_str, newFile, eq_index)
-                    db_path = '{domain}/img/{folder}/{year}/{month}/{day}/{img_name}'.format(domain=oss_domain,
+                    db_path = '{domain}/img/{folder}/{year}/{month}/{day}/{img_name}'.format(domain=self.oss_domain,
                         folder='tmp', year=year, month=month, day=day, img_name=img_name)
                     # new_eq_str = "<img src='{0}'></img>".format(db_path)
                     img_eq = Image.open(newFile)
@@ -211,7 +205,7 @@ class CAutopic():
                 .replace("</w:tc>", "</td>") \
                 .replace("</w:tr>", "</tr>") \
                 .replace("</w:tbl>", "</table>")
-            current_app.logger.info(use_str)
+            # current_app.logger.info(use_str)
             point_use = "．"  # 用来区分题目的点位
             # point_use = "."
             # 题目标号
@@ -237,6 +231,29 @@ class CAutopic():
         # os.removedirs(path3+"_files")
         return paper_dict
 
+    def replace_img(self, target_list, rId_list, rId, use_str, path3, match_str):
+        target_list_dict = target_list[rId_list.index(rId)].split("/")
+        current_app.logger.info(use_str)
+        current_app.logger.info(">>>>>>>>>>>target_dict:" + str(target_list_dict))
+        if len(target_list_dict) > 1:
+            current_app.logger.info(">>>>>>>>>>target_list_dict:" + str(target_list_dict))
+            # picture_path = path3 + "_files\\word" + "\\" + target_list_dict[0] + "\\" + \
+            #                target_list_dict[1]
+            picture_path = os.path.join(path3 + "_files", 'word', target_list_dict[0], target_list_dict[1])
+            url_response = self.upload_to_oss(picture_path)
+            # files = {
+            #     "file": (target_list_dict[1], open(r"{0}".format(picture_path), "rb"), "image/png")
+            # }
+            # response = requests.post(headers=header, files=files, url=url)
+            # json_response = json.loads(response.content)
+            # url_response = json_response["data"]["url"]
+            # print(">>>>>>>>>>>>>>>>>>url_response:" + str(url_response))
+            use_str = use_str.replace(
+                match_str,"<img src='{0}'></img>".format(self.oss_domain + url_response))
+        else:
+            use_str = use_str.replace(match_str,"<img src='{0}'></img>".format(
+                str(target_list[rId_list.index(rId)])))
+        return use_str
     @staticmethod
     def get_eqcontent(str_eq, index):
         # 获取解析字符串
@@ -271,6 +288,10 @@ class CAutopic():
         elif eq_str.startswith('\\o'):
             self.split_o(eq_str, file_path=file_path)
             draw_str = False
+        elif eq_str.startswith('\\s'):
+            dealstr = self.deal_s(eq_str)
+            return dealstr
+            draw_str = False
         else:
             draw_str = self.replace_item(eq_str)
             draw_str = self.replace_sign(draw_str)
@@ -287,7 +308,7 @@ class CAutopic():
 
         self.formula2img(draw_str, file_path, img_size=img_size, font_size=64)
         self.upload_to_oss(file_path, 'eq域')
-        return True
+        return False
 
     def split_o(self, str_eq, file_path):
         r"""\o(=, \s\up7(点燃)) """
@@ -315,13 +336,13 @@ class CAutopic():
         for _ in f_list:
             imgsize[1] = imgsize[1] + 1
             imgsize[0] = imgsize[0] + 1
-            index_f = str_eq.index(r'\f', index_f)
+            index_f = str_eq.index(r'\f', index_f) + 1
             f_start = 0
             f_end = 0
             for brac in brac_eq:
                 if int(brac) > int(index_f):
                     f_start = int(brac)
-                    f_end = int(brac_eq.get(brac))
+                    f_end = int(brac_eq.get(brac) or -1)
                     break
             f_str = self.deal_f(str_eq[f_start + 1: f_end], file_path, imgsize)
             new_str_sub_list.append({'fstr': f_str, 'fstart': f_start, 'fend': f_end})
@@ -345,7 +366,7 @@ class CAutopic():
         for _ in r_list:
             imgsize[1] = imgsize[1] + 0.5
             imgsize[0] = imgsize[0] + 0.5
-            index_r = str_eq.index(r'\r', index_r)
+            index_r = str_eq.index(r'\r', index_r) + 1
             f_start = 0
             f_end = 0
             for brac in brac_eq:
@@ -375,7 +396,7 @@ class CAutopic():
         new_str_tmp = str_eq
         for _ in r_list:
             imgsize[0] = imgsize[0] + 2
-            index_r = str_eq.index(r'\b', index_r)
+            index_r = str_eq.index(r'\b', index_r) + 1
             f_start = 0
             f_end = 0
             left_ch = '('
@@ -416,7 +437,8 @@ class CAutopic():
     def deal_o(self, str_eq, file_path=''):
         r"""\o(=, \s\up7(点燃)) """
         img_base = Image.new('RGB', (1200, 1200), 'white')
-        font_normal = imf.truetype(os.path.join('./', 'PingFang Medium_downcc.otf'), 24)
+        font_normal = imf.truetype(os.path.join(
+            current_app.config['BASEDIR'], 'jinrui', 'PingFang Medium_downcc.otf'), 24)
         x, y = 0, 0
         dw = imd.Draw(img_base)
         new_str_list = str_eq.split(',')
@@ -516,23 +538,32 @@ class CAutopic():
             month = str(time_now.month)
             day = str(time_now.day)
             newPath = os.path.join(current_app.config['BASEDIR'], 'img', 'tmp', year, month, day)
-            tmp_name = 'tmp{}.png'
+            # tmp_name = 'tmp{}.png'
+
             # tmp_path = r'd:\tmp{}.png'
             font_size = {2: 128, 3: 228, 4: 300}
+            name_list = []
             # formula2img(r'$\left\{\right.$', tmp_path.format('char'), img_size=(1, 5), font_size=128)
             # 准备部件配图
             for i, new_sub in enumerate(new_list):
                 width = len(new_sub) / 6 * 4
                 # formula2img(new_sub, tmp_path.format(i), img_size=(width, 1), font_size=64)
-                tmp_path = os.path.join(newPath, tmp_name.format(i))
+                tmp_name = self.random_name('.png')
+                tmp_path = os.path.join(newPath, tmp_name)
                 self.switch_draw(new_sub, img_size=[width, 1], file_path=tmp_path)
                 img_tmp = Image.open(tmp_path)
                 tmp_x, tmp_y = img_tmp.size
+                name_list.append(tmp_path)
                 img_tmp.crop((1, 1, tmp_x - 1, tmp_y - 1)).save(tmp_path)
 
             # 画基图
             img_base = Image.new('RGB', (1200, 1200), 'white')
-            font_normal = imf.truetype(os.path.join(current_app.config['BASEDIR'], 'jinrui', 'PingFang Medium_downcc.otf'), font_size.get(len(new_list)))
+            current_app.logger.info('get otf {}'.format(os.path.join(
+                current_app.config['BASEDIR'], 'jinrui', 'PingFang Medium_downcc.otf')))
+
+            font_normal = imf.truetype(os.path.join(
+                current_app.config['BASEDIR'], 'jinrui', 'PingFang Medium_downcc.otf'), font_size.get(len(new_list)))
+            current_app.logger.info('get otf over')
             dw = imd.Draw(img_base)
             x, y = 0, 0
             dw.text((x, y), '{', font=font_normal, fill='#000000')
@@ -543,7 +574,7 @@ class CAutopic():
             x = 64
             max_x = x
             for i in range(len(new_list)):
-                tmp_path = os.path.join(newPath, tmp_name.format(i))
+                tmp_path = name_list[i]
                 img_tmp = Image.open(tmp_path)
                 tmp_x, tmp_y = img_tmp.size
                 # img_base.size
@@ -551,9 +582,9 @@ class CAutopic():
                 y = tmp_y + y
                 if max_x < x + tmp_x:
                     max_x = x + tmp_x
-            tmp_path = os.path.join(newPath, tmp_name.format('final'))
+            # tmp_path = os.path.join(newPath, tmp_name.format('final'))
             img_base.crop((0, 0, max_x, y)).save(file_path)
-            self.upload_to_oss(tmp_path, 'eq域')
+            self.upload_to_oss(file_path, 'eq域')
             return ''
 
         else:
@@ -581,6 +612,26 @@ class CAutopic():
         else:
             r_str = new_str
         return r_str
+
+    def deal_s(self, str_eq):
+        current_app.logger.info(str_eq)
+        new_str = str_eq
+        brac_eq = self.get_brac_dict(str_eq)
+        index_s = new_str.index(r'\s')
+        f_start = 0
+        f_end = 0
+        for brac in brac_eq:
+            if int(brac) > int(index_s):
+                f_start = int(brac)
+                f_end = int(brac_eq.get(brac))
+                break
+        content = new_str[f_start + 1: f_end]
+        if r'\up' in new_str:
+            return "<sup>{}</sup>".format(content)
+        elif r'\do' in new_str:
+            return '<sub>{}</sub>'.format(content)
+
+        # return r_str
 
     @staticmethod
     def formula2img(str_latex, out_file, img_size=(5, 3), font_size=16):
@@ -713,8 +764,10 @@ class CAutopic():
 # from jinrui import create_app
 # app = create_app()
 # with app.app_context():
-#     # doc_path = r'D:\testdocx\数学  推演卷（一） A卷.docx'
-#     doc_path = r'D:\teamsystem\jinrui-test\img\doc\2020\10\30\LMbKgJKutaAb5pZtpACz.docx'
+# #     # doc_path = r'D:\testdocx\数学  推演卷（一） A卷.docx'
+# #     doc_path = r'D:\teamsystem\jinrui-test\img\doc\2020\10\30\LMbKgJKutaAb5pZtpACz.docx'
 #     cp = CAutopic()
-#     papger = cp.transfordoc(doc_path)
-#     print(papger)
+# #     papger = cp.transfordoc(doc_path)
+# #     print(papger)
+#     a = r'''<w:fldChar w:fldCharType="begin"/>eq \f(1 350－1 150,\f(2,3)×120)<w:fldChar w:fldCharType="end"/>'''
+#     cp.draw_pic(a, r'D:\teamsystem\jinrui-test\img\doc\2020\10\30\LMbKgJKutaAb5pZtpACz.png')
