@@ -70,7 +70,7 @@ class j_answer_booklet(Base):
     答卷
     """
     __tablename__ = "j_answer_booklet"
-    id = Column(String(32), primary_key=True)
+    id = Column(String(64), primary_key=True)
     paper_id = Column(String(32), nullable=False, comment="试卷id")
     student_id = Column(String(32), comment="学生id")
     status = Column(String(10), comment="批阅状态")
@@ -88,9 +88,9 @@ class j_score(Base):
     答卷题目
     """
     __tablename__ = "j_score"
-    id = Column(String(32), primary_key=True)
+    id = Column(String(64), primary_key=True)
     student_id = Column(String(32), comment="学生id")
-    booklet_id = Column(String(32), nullable=False, comment="答卷id")
+    booklet_id = Column(String(64), nullable=False, comment="答卷id")
     question_id = Column(String(32), comment="题目id")
     score = Column(Integer, comment="得分")
     question_url = Column(Text, comment="答题图片url")
@@ -154,8 +154,9 @@ class j_answer_png(Base):
     student_no = Column(String(20), comment="学生考号")
     student_name = Column(String(255), comment="学生姓名")
     school = Column(String(255), comment="学校名称")
-    result_score = Column(Integer, comment="考卷分数")
-    result_update = Column(Integer, comment="考卷分数订正")
+    result_score = Column(Integer, comment="考卷分数", default=0)
+    result_update = Column(Integer, comment="考卷分数订正", default=0)
+    score_id = Column(String(64), comment="答题id")
 
 class j_answer_upload(Base):
     """
