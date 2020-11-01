@@ -5,12 +5,13 @@ from datetime import datetime
 from ..config.enums import PngType
 from ..extensions.success_response import Success
 from jinrui.config.secret import ACCESS_KEY_SECRET, ACCESS_KEY_ID, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME
-from jinrui.extensions.register_ext import db
+from jinrui.extensions.register_ext import db, ali_oss
 from ..extensions.params_validates import parameter_required
-from jinrui.extensions.error_response import ErrorFileType, ErrorAnswerType
+from jinrui.extensions.error_response import ErrorFileType, ErrorAnswerType, ParamsError
 from jinrui.models.jinrui import j_manager, j_answer_zip, j_answer_pdf, j_paper, j_answer_sheet, j_answer_png, \
     j_role, j_organization, j_school_network, j_answer_upload
 from flask import current_app, request
+from sqlalchemy import false
 
 class CAnswer():
 

@@ -3,6 +3,7 @@ from flask import Flask
 from flask import Blueprint
 from flask_cors import CORS
 
+from .api.APdfUpload import APdfUpload
 from .api.AHello import AHello
 from .api.AOcr import AOcr
 from .api.APpt import APpt
@@ -22,6 +23,7 @@ def register(app):
     jr.add_url_rule('/hello/<string:hello>', view_func=AHello.as_view('hello'))
     jr.add_url_rule('/ocr/<string:ocr>', view_func=AOcr.as_view('ocr'))
     jr.add_url_rule('/ppt/<string:ppt>', view_func=APpt.as_view('ppt'))
+    jr.add_url_rule('/pdf/<string:pdf>', view_func=APdfUpload.as_view('pdf'))
     jr.add_url_rule('/paper/<string:paper>', view_func=APaper.as_view('paper'))
     jr.add_url_rule('/answer/<string:answer>', view_func=AAnswer.as_view('answer'))
     jr.add_url_rule('/file/<string:file>', view_func=AFile.as_view('file'))
