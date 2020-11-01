@@ -1,13 +1,13 @@
 # import sheet
-import os, uuid, oss2, shutil, json, cv2, fitz, platform
+import os, uuid, oss2, shutil, json, cv2, fitz, platform, requests
 from datetime import datetime
 
-from ..config.enums import TestEnum
 from ..extensions.success_response import Success
 from jinrui.config.secret import ACCESS_KEY_SECRET, ACCESS_KEY_ID, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME
 from jinrui.extensions.register_ext import db
 from ..extensions.params_validates import parameter_required
-from jinrui.models.jinrui import j_question, j_answer_pdf
+from jinrui.models.jinrui import j_question, j_answer_pdf, j_answer_png, j_student, j_organization, j_school_network, \
+    j_answer_zip, j_paper, j_score, j_answer_booklet, j_answer_upload
 from flask import current_app
 
 class COcr():
@@ -15,8 +15,8 @@ class COcr():
     def __init__(self):
         self.index_h = 1684 / 1124.52
         self.index_w = 1191 / 810.81
-        self.width_less = 4
-        self.height_less = -30
+        self.width_less = 0
+        self.height_less = 0
 
     def mock_ocr_response(self):
         args = parameter_required(("image_url", "image_type"))
@@ -46,62 +46,461 @@ class COcr():
         return Success(data=data)
 
     def deal_pdf(self):
+        # 比对正确答案处理分数
+        # 处理异常情况（异常试卷和异常返回值）
+        # 整体流程测试
         pdf = j_answer_pdf.query.filter(j_answer_pdf.isdelete == 0, j_answer_pdf.pdf_status == "300301")\
             .order_by(j_answer_pdf.createtime.desc()).first()
-        pdf_url = pdf.pdf_url
-        sheet_dict = json.loads(pdf.sheet_dict)
+        if pdf and pdf.pdf_ip:
+            school_network = j_school_network.query.filter(j_school_network.net_ip == pdf.pdf_ip).first()
+            if school_network:
+                school_name = school_network.school_name
+            else:
+                school_name = pdf.pdf_school
+            print(">>>>>>>>>>>>>>>>>>school_name:" + str(school_name))
+            organization = j_organization.query.filter(j_organization.name == school_name,
+                                                       j_organization.role_type == "SCHOOL").first()
+            org_id = organization.id
+            # 组织list，用于判断学生的组织id是否在其中，从而判断学生对应信息
+            children_id_list = self._get_all_org_behind_id(org_id)
+            print(">>>>>>>>>>>>>>>>>children_id:" + str(children_id_list))
 
-        pdf_uuid = str(uuid.uuid1())
-        # 创建pdf存储路径
-        if platform.system() == "Windows":
-            pdf_path = "D:\\jinrui_pdf\\" + pdf_uuid + "\\"
-        else:
-            pdf_path = "/tmp/jinrui_pdf/" + pdf_uuid + "/"
-        if not os.path.exists(pdf_path):
-            os.makedirs(pdf_path)
+            upload_id = pdf.upload_id
+            pdf_url = pdf.pdf_url
+            pdf_uuid = str(uuid.uuid1())
+            # 创建pdf存储路径
+            if platform.system() == "Windows":
+                pdf_path = "D:\\jinrui_pdf\\" + pdf_uuid + "\\"
+            else:
+                pdf_path = "/tmp/jinrui_pdf/" + pdf_uuid + "/"
+            if not os.path.exists(pdf_path):
+                os.makedirs(pdf_path)
 
-        auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
-        bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
+            auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
+            bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
 
-        pdf_name = pdf_url.split("/")
-        pdf_save_path = pdf_path + pdf_name[-1]
-        # 存储pdf到本地
-        result = bucket.get_object_to_file(pdf_name[-1], pdf_save_path)
+            pdf_name = pdf_url.split("/")
+            pdf_save_path = pdf_path + pdf_name[-1]
+            # 存储pdf到本地
+            result = bucket.get_object_to_file(pdf_name[-1], pdf_save_path)
 
-        if result.status != 200:
-            with db.auto_commit():
-                pdf_use = j_answer_pdf.query.filter(j_answer_pdf.pdf_id == pdf.pdf_id).first()
-                pdf_instance = pdf_use.update({
-                    "pdf_status": "300303"
-                })
-                db.session.add(pdf_instance)
-        else:
-            with db.auto_commit():
-                pdf_use = j_answer_pdf.query.filter(j_answer_pdf.pdf_id == pdf.pdf_id).first()
-                pdf_instance = pdf_use.update({
-                    "pdf_status": "300304"
-                })
-                db.session.add(pdf_instance)
+            if result.status != 200:
+                with db.auto_commit():
+                    pdf_use = j_answer_pdf.query.filter(j_answer_pdf.pdf_id == pdf.pdf_id).first()
+                    pdf_instance = pdf_use.update({
+                        "pdf_status": "300303"
+                    })
+                    db.session.add(pdf_instance)
+            else:
+                with db.auto_commit():
+                    pdf_use = j_answer_pdf.query.filter(j_answer_pdf.pdf_id == pdf.pdf_id).first()
+                    pdf_instance = pdf_use.update({
+                        "pdf_status": "300304"
+                    })
+                    db.session.add(pdf_instance)
+                jpg_dir = self._conver_img(pdf_path, pdf_save_path, pdf_name[-1])
+                print(jpg_dir)
 
-            jpg_dir = self._conver_img(pdf_path, pdf_save_path)
+                if len(jpg_dir) % 4 != 0:
+                    with db.auto_commit():
+                        pdf_use = j_answer_pdf.query.filter(j_answer_pdf.pdf_id == pdf.pdf_id).first()
+                        pdf_instance = pdf_use.update({
+                            "pdf_status": "300303"
+                        })
+                        db.session.add(pdf_instance)
+                else:
+                    jpg_index = 0
+                    # 一组卷
+                    while jpg_index < len(jpg_dir):
+                        booklet_id = str(uuid.uuid1())
+                        jpg_dict = jpg_dir[jpg_index: jpg_index + 4]
+                        jpg_path = pdf_path + jpg_dict[0]
+                        # 第一页oss
+                        jpg_upload_oss = self._upload_oss(jpg_dict[0], jpg_path)
+                        if jpg_upload_oss["code"] == 200:
+                            jpg_url = jpg_upload_oss["jpg_url"]
+                        else:
+                            jpg_url = None
+                        # 第二页oss
+                        jpg_upload_oss = self._upload_oss(jpg_dict[1], jpg_path)
+                        if jpg_upload_oss["code"] == 200:
+                            jpg_url_two = jpg_upload_oss["jpg_url"]
+                        else:
+                            jpg_url_two = None
+                        # 第三页oss
+                        jpg_upload_oss = self._upload_oss(jpg_dict[2], jpg_path)
+                        if jpg_upload_oss["code"] == 200:
+                            jpg_url_three = jpg_upload_oss["jpg_url"]
+                        else:
+                            jpg_url_three = None
+                        # 第四页oss
+                        jpg_upload_oss = self._upload_oss(jpg_dict[3], jpg_path)
+                        if jpg_upload_oss["code"] == 200:
+                            jpg_url_four = jpg_upload_oss["jpg_url"]
+                        else:
+                            jpg_url_four = None
+                        jpg_oss_list = [jpg_url, jpg_url_two, jpg_url_three, jpg_url_four]
+                        # 获取sn
+                        print(pdf_path)
+                        print(jpg_dict[0])
+                        sn_result = self._cut_sn(pdf_path, jpg_dict[0])
+                        sn = sn_result["png_result"]
+                        print(">>>>>>>>>>>>>>>>>>>>>sn:" + str(sn))
+                        # 获取学号
+                        no_result = self._cut_no(pdf_path, jpg_dict[0])
+                        no = no_result["png_result"]
+                        students = j_student.query.filter(j_student.student_number == no).all()
+                        student_name = None
+                        student_id = None
+                        for student in students:
+                            if student.org_id in children_id_list:
+                                student_name = student.name
+                                student_id = student.id
+                        no_dict = {
+                            "isdelete": 0,
+                            "createtime": datetime.now(),
+                            "updatetime": datetime.now(),
+                            "png_id": str(uuid.uuid1()),
+                            "png_url": no_result["png_url"],
+                            "pdf_id": pdf.pdf_id,
+                            "png_result": no,
+                            "png_status": no_result["png_status"],
+                            "png_type": no_result["png_type"],
+                            "booklet_id": booklet_id,
+                            "page_url": jpg_url,
+                            "student_no": no,
+                            "student_name": student_name,
+                            "school": school_name
+                        }
+                        print(">>>>>>>>>>>>>>>>>>>>>no:" + str(no))
+                        with db.auto_commit():
+                            png_instance = j_answer_png.create(no_dict)
+                            db.session.add(png_instance)
 
-            shutil.rmtree(pdf_path)
+                        sn_dict = {
+                            "isdelete": 0,
+                            "createtime": datetime.now(),
+                            "updatetime": datetime.now(),
+                            "png_id": str(uuid.uuid1()),
+                            "png_url": sn_result["png_url"],
+                            "pdf_id": pdf.pdf_id,
+                            "png_result": sn,
+                            "png_status": sn_result["png_status"],
+                            "png_type": sn_result["png_type"],
+                            "booklet_id": booklet_id,
+                            "page_url": jpg_url,
+                            "student_no": no,
+                            "student_name": student_name,
+                            "school": school_name
+                        }
+                        with db.auto_commit():
+                            png_instance = j_answer_png.create(sn_dict)
+                            db.session.add(png_instance)
 
-            return jpg_dir
+                        if pdf.pdf_address == "zip":
+                            zip_id = pdf.zip_id
+                            zip_file = j_answer_zip.query.filter(j_answer_zip.zip_id == zip_id).first()
+                            upload_by = zip_file.zip_upload_user
+                        else:
+                            upload_by = pdf.pdf_school
 
-    def _cut_pic_use_ocr(self):
-        """
-        1.判断jpg_dir长度
-        2.jpg_dir数组切片
-        3.jpg_
-        """
+                        paper = j_paper.query.filter(j_paper.id == sn).first()
+                        if paper:
+                            paper_id = sn
+                        else:
+                            paper_id = None
+                        # 封装某个学生的某套答卷dict
+                        booklet_dict = {
+                            "id": booklet_id,
+                            "paper_id": paper_id,
+                            "student_id": student_id,
+                            "status": "1",
+                            "url": pdf.pdf_url,
+                            "upload_by": upload_by,
+                            "upload_id": upload_id
+                        }
+                        if student_id and paper_id:
+                            for sheet in json.loads(pdf.sheet_dict):
+                                # jpg路径
+                                # jpg_path = pdf_path + jpg_dict[sheet["page"] - 1]
+                                if sheet["type"] == "select":
+                                    select_list = self._cut_select(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
+                                    with db.auto_commit():
+                                        for select in select_list:
+                                            question_number = select["question_number"]
+                                            question = j_question.query.filter(j_question.paper_id == paper_id,
+                                                                               j_question.question_number == str(question_number))\
+                                                .first()
+                                            score_id = str(uuid.uuid1())
+                                            score_dict = {
+                                                "id": score_id,
+                                                "student_id": student_id,
+                                                "booklet_id": booklet_id,
+                                                "question_id": question.id,
+                                                "grade_by": "system-ocr",
+                                                "question_number": question_number,
+                                                "score": 0,
+                                                "question_url": select.get("png_url"),
+                                                "status": "304"
+                                            }
+                                            select_dict = {
+                                                "isdelete": 0,
+                                                "createtime": datetime.now(),
+                                                "updatetime": datetime.now(),
+                                                "png_id": str(uuid.uuid1()),
+                                                "png_url": select.get("png_url"),
+                                                "pdf_id": pdf.pdf_id,
+                                                "png_result": select.get("png_result"),
+                                                "png_status": select.get("png_status"),
+                                                "png_type": select.get("png_type"),
+                                                "booklet_id": booklet_id,
+                                                "page_url": jpg_oss_list[sheet["page"] - 1],
+                                                "student_no": no,
+                                                "student_name": student_name,
+                                                "school": school_name,
+                                                "result_score": 0,
+                                                "result_update": 0,
+                                                "score_id": score_id
+                                            }
+                                            select_instance = j_answer_png.create(select_dict)
+                                            db.session.add(select_instance)
+                                            score_instance = j_score.create(score_dict)
+                                            db.session.add(score_instance)
+                                elif sheet["type"] == "multi":
+                                    multi_list = self._cut_multi(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
+                                    with db.auto_commit():
+                                        for select in multi_list:
+                                            question_number = select["question_number"]
+                                            question = j_question.query.filter(j_question.paper_id == paper_id,
+                                                                               j_question.question_number == str(
+                                                                                   question_number)) \
+                                                .first()
+                                            score_id = str(uuid.uuid1())
+                                            score_dict = {
+                                                "id": score_id,
+                                                "student_id": student_id,
+                                                "booklet_id": booklet_id,
+                                                "question_id": question.id,
+                                                "grade_by": "system-ocr",
+                                                "question_number": question_number,
+                                                "score": 0,
+                                                "question_url": select.get("png_url"),
+                                                "status": "304"
+                                            }
+                                            select_dict = {
+                                                "isdelete": 0,
+                                                "createtime": datetime.now(),
+                                                "updatetime": datetime.now(),
+                                                "png_id": str(uuid.uuid1()),
+                                                "png_url": select.get("png_url"),
+                                                "pdf_id": pdf.pdf_id,
+                                                "png_result": select.get("png_result"),
+                                                "png_status": select.get("png_status"),
+                                                "png_type": select.get("png_type"),
+                                                "booklet_id": booklet_id,
+                                                "page_url": jpg_oss_list[sheet["page"] - 1],
+                                                "student_no": no,
+                                                "student_name": student_name,
+                                                "school": school_name,
+                                                "result_score": 0,
+                                                "result_update": 0,
+                                                "score_id": score_id
+                                            }
+                                            select_instance = j_answer_png.create(select_dict)
+                                            db.session.add(select_instance)
+                                            score_instance = j_score.create(score_dict)
+                                            db.session.add(score_instance)
+                                elif sheet["type"] == "judge":
+                                    judge_list = self._cut_judge(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
+                                    with db.auto_commit():
+                                        for select in judge_list:
+                                            question_number = select["question_number"]
+                                            question = j_question.query.filter(j_question.paper_id == paper_id,
+                                                                               j_question.question_number == str(
+                                                                                   question_number)) \
+                                                .first()
+                                            score_id = str(uuid.uuid1())
+                                            score_dict = {
+                                                "id": score_id,
+                                                "student_id": student_id,
+                                                "booklet_id": booklet_id,
+                                                "question_id": question.id,
+                                                "grade_by": "system-ocr",
+                                                "question_number": question_number,
+                                                "score": 0,
+                                                "question_url": select.get("png_url"),
+                                                "status": "304"
+                                            }
+                                            select_dict = {
+                                                "isdelete": 0,
+                                                "createtime": datetime.now(),
+                                                "updatetime": datetime.now(),
+                                                "png_id": str(uuid.uuid1()),
+                                                "png_url": select.get("png_url"),
+                                                "pdf_id": pdf.pdf_id,
+                                                "png_result": select.get("png_result"),
+                                                "png_status": select.get("png_status"),
+                                                "png_type": select.get("png_type"),
+                                                "booklet_id": booklet_id,
+                                                "page_url": jpg_oss_list[sheet["page"] - 1],
+                                                "student_no": no,
+                                                "student_name": student_name,
+                                                "school": school_name,
+                                                "result_score": 0,
+                                                "result_update": 0,
+                                                "score_id": score_id
+                                            }
+                                            select_instance = j_answer_png.create(select_dict)
+                                            db.session.add(select_instance)
+                                            score_instance = j_score.create(score_dict)
+                                            db.session.add(score_instance)
+                                elif sheet["type"] == "fill":
+                                    score_id = str(uuid.uuid1())
+                                    question_number = sheet["start"]
+                                    question = j_question.query.filter(j_question.paper_id == paper_id,
+                                                                       j_question.question_number == str(
+                                                                           question_number)) \
+                                        .first()
+                                    if pdf.pdf_use == "300201":
+                                        fill_dict_ocr = self._cut_fill_ocr(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
+                                        fill_dict = self._cut_fill_all(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
+                                        score_dict = {
+                                            "id": score_id,
+                                            "student_id": student_id,
+                                            "booklet_id": booklet_id,
+                                            "question_id": question.id,
+                                            "grade_by": "system-ocr",
+                                            "question_number": question_number,
+                                            "score": 0,
+                                            "question_url": fill_dict.get("png_url"),
+                                            "status": "304"
+                                        }
+                                        select_dict = {
+                                            "isdelete": 0,
+                                            "createtime": datetime.now(),
+                                            "updatetime": datetime.now(),
+                                            "png_id": str(uuid.uuid1()),
+                                            "png_url": fill_dict_ocr.get("png_url"),
+                                            "pdf_id": pdf.pdf_id,
+                                            "png_result": fill_dict_ocr.get("png_result"),
+                                            "png_status": fill_dict_ocr.get("png_status"),
+                                            "png_type": fill_dict_ocr.get("png_type"),
+                                            "booklet_id": booklet_id,
+                                            "page_url": jpg_oss_list[sheet["page"] - 1],
+                                            "student_no": no,
+                                            "student_name": student_name,
+                                            "school": school_name,
+                                            "result_score": 0,
+                                            "result_update": 0,
+                                            "score_id": score_id
+                                        }
+                                    else:
+                                        fill_dict = self._cut_fill_all(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
+                                        score_dict = {
+                                            "id": score_id,
+                                            "student_id": student_id,
+                                            "booklet_id": booklet_id,
+                                            "question_id": question.id,
+                                            "grade_by": "system-ocr",
+                                            "question_number": question_number,
+                                            "score": 0,
+                                            "question_url": fill_dict.get("png_url"),
+                                            "status": "302"
+                                        }
+                                        select_dict = None
+                                    with db.auto_commit():
+                                        if select_dict:
+                                            select_instance = j_answer_png.create(select_dict)
+                                            db.session.add(select_instance)
+                                        score_instance = j_score.create(score_dict)
+                                        db.session.add(score_instance)
+                                elif sheet["type"] == "answer":
+                                    score_id = str(uuid.uuid1())
+                                    question_number = sheet["start"]
+                                    question = j_question.query.filter(j_question.paper_id == paper_id,
+                                                                       j_question.question_number == str(
+                                                                           question_number)) \
+                                        .first()
 
+                                    answer_dict_ocr = self._cut_answer_ocr(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
+                                    answer_dict = self._cut_answer_all(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
+                                    if pdf.pdf_use == "300201":
+                                        score_dict = {
+                                            "id": score_id,
+                                            "student_id": student_id,
+                                            "booklet_id": booklet_id,
+                                            "question_id": question.id,
+                                            "grade_by": "system-ocr",
+                                            "question_number": question_number,
+                                            "score": 0,
+                                            "question_url": answer_dict.get("png_url"),
+                                            "status": "304"
+                                        }
+                                        select_dict = {
+                                            "isdelete": 0,
+                                            "createtime": datetime.now(),
+                                            "updatetime": datetime.now(),
+                                            "png_id": str(uuid.uuid1()),
+                                            "png_url": answer_dict_ocr.get("png_url"),
+                                            "pdf_id": pdf.pdf_id,
+                                            "png_result": answer_dict_ocr.get("png_result"),
+                                            "png_status": answer_dict_ocr.get("png_status"),
+                                            "png_type": answer_dict_ocr.get("png_type"),
+                                            "booklet_id": booklet_id,
+                                            "page_url": jpg_oss_list[sheet["page"] - 1],
+                                            "student_no": no,
+                                            "student_name": student_name,
+                                            "school": school_name,
+                                            "result_score": 0,
+                                            "result_update": 0,
+                                            "score_id": score_id
+                                        }
+                                    else:
+                                        score_dict = {
+                                            "id": score_id,
+                                            "student_id": student_id,
+                                            "booklet_id": booklet_id,
+                                            "question_id": question.id,
+                                            "grade_by": "system-ocr",
+                                            "question_number": question_number,
+                                            "score": 0,
+                                            "question_url": answer_dict.get("png_url"),
+                                            "status": "302"
+                                        }
+                                        select_dict = None
+                                    with db.auto_commit():
+                                        if select_dict:
+                                            select_instance = j_answer_png.create(select_dict)
+                                            db.session.add(select_instance)
+                                        score_instance = j_score.create(score_dict)
+                                        db.session.add(score_instance)
 
-    def _conver_img(self, pdf_path, pdf_save_path):
+                            with db.auto_commit():
+                                booklet_instance = j_answer_booklet.create(booklet_dict)
+                                db.session.add(booklet_instance)
+                                pdf_instance = pdf.update({
+                                    "pdf_status": "300302"
+                                }, null="not")
+                                db.session.add(pdf_instance)
+                                pdf_error_status = j_answer_pdf.query.filter(j_answer_pdf.upload_id == upload_id, j_answer_pdf.pdf_status.in_(["300301", "300303", "300304"])).all()
+                                if not pdf_error_status:
+                                    upload = j_answer_upload.query.filter(j_answer_upload.id == upload_id).first()
+                                    upload_instance = upload.update({
+                                        "status": "待分配"
+                                    })
+                                    db.session.add(upload_instance)
+                        jpg_index = jpg_index + 4
+
+                shutil.rmtree(pdf_path)
+
+                return jpg_dir
+
+    def _conver_img(self, pdf_path, pdf_save_path, pdf_name):
         """
         将pdf转化为jpg
         """
         doc = fitz.Document(pdf_save_path)
+        pdf_name_without_ext = pdf_name.split(".")[0]
         i = 1
         for pg in range(doc.pageCount):
             page = doc[pg]
@@ -111,7 +510,10 @@ class COcr():
             zoom_y = 2.0
             trans = fitz.Matrix(zoom_x, zoom_y).preRotate(rotate)
             pm = page.getPixmap(matrix=trans, alpha=False)
-            pm.writePNG(pdf_path + '\\{0}.jpg'.format("%04d" % i))
+            if platform.system() == "Windows":
+                pm.writePNG(pdf_path + '\\{0}-{1}.jpg'.format(pdf_name_without_ext, "%04d" % i))
+            else:
+                pm.writePNG(pdf_path + '/{0}-{1}.jpg'.format(pdf_name_without_ext, "%04d" % i))
             i = i + 1
 
         jpg_dir = []
@@ -130,226 +532,437 @@ class COcr():
         framenum: 文件名
         tracker: 存储文件夹
         """
-        pathnew = path + "\\"
-
-        if (os.path.exists(pathnew + tracker)):
-            current_app.logger.info(">>>>>>>>>>>>>>>>>" + framenum)
-            cv2.imwrite(pathnew + tracker + '\\' + framenum + '.jpg', cropImg, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
-
+        if platform.system() == "Windows":
+            png_path = path + tracker + '\\' + framenum + '.jpg'
         else:
-            os.makedirs(pathnew + tracker)
-            cv2.imwrite(pathnew + tracker + '\\' + framenum + '.jpg', cropImg, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+            png_path = path + tracker + '/' + framenum + '.jpg'
+        if (os.path.exists(path + tracker)):
+            cv2.imwrite(png_path, cropImg, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+        else:
+            os.makedirs(path + tracker)
+            cv2.imwrite(png_path, cropImg, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
-    def _cut_sn(self, path, jpg_dir):
+        return framenum + ".jpg", png_path
+
+    def _upload_oss(self, file_name, file_path):
+        auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
+        bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
+        file_fullname = file_name.split(".")[0]
+        ext = file_name.split(".")[1]
+        jpg_uuid = str(uuid.uuid1())
+
+        jpg_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + file_fullname + "-" + jpg_uuid + "." + ext
+        result = bucket.put_object_from_file(file_fullname + "-" + jpg_uuid + "." + ext, file_path)
+
+        return {
+            "code": result.status,
+            "jpg_url": jpg_url
+        }
+
+    def _cut_sn(self, path, jpg):
         """
         剪切sn号
         """
-        for jpg in jpg_dir:
-            jpg_name_dict = jpg.replace(".jpg", "").split("-")
-            if int(jpg_name_dict[1]) % 4 == 1:
-                img = cv2.imread(r"{0}".format(path + "\\" + jpg))
-                sn_w = 600 + self.width_less
-                sn_y = 40 + self.height_less
-                sn_height = 16
-                sn_width = 115
-                print(int(sn_y * self.index_h))
-                print(int(sn_w * self.index_w))
-                crop_img = img[int(sn_y * self.index_h): int((sn_y + sn_height) * self.index_h),
-                           int(sn_w * self.index_w): int((sn_w + sn_width) * self.index_w)]
-                self._label2picture(path, crop_img, "sn-{0}".format(str(int(int(jpg_name_dict[1]) / 4))), jpg_name_dict[0])
+        jpg_name_without_ext = jpg.split(".")[0]
+        img = cv2.imread(r"{0}".format(path + jpg))
+        sn_w = 600 + self.width_less
+        sn_y = 40 + self.height_less
+        sn_height = 16
+        sn_width = 135
+        crop_img = img[int(sn_y * self.index_h): int((sn_y + sn_height) * self.index_h),
+                   int(sn_w * self.index_w): int((sn_w + sn_width) * self.index_w)]
 
-    def _cut_select(self, path, name_dir, sheet_json, jpg_dir):
+        png_name, png_path = self._label2picture(path, crop_img, "sn", jpg_name_without_ext)
+
+        upload_oss = self._upload_oss(png_name, png_path)
+        if upload_oss["code"] == 200:
+            jpg_url = upload_oss["jpg_url"]
+            response = requests.get("https://jinrui.sanbinit.cn/api/ocr/mock_ocr_response?image_url={0}&image_type={1}".format(jpg_url, "5"))
+            print(response.content)
+            content = json.loads(response.content)
+            if content["data"]["err"] not in ["848", "849"]:
+                value = content["data"]["values"]
+                png_status = "301"
+            else:
+                value = None
+                png_status = "303"
+            return {
+                "png_result": value,
+                "png_url": upload_oss["jpg_url"],
+                "png_status": png_status,
+                "png_type": "28"
+            }
+        else:
+            return {
+                "png_result": None,
+                "png_url": None,
+                "png_status": None,
+                "png_type": None
+            }
+
+    def _cut_no(self, path, jpg):
+        """
+        剪切准考证号
+        """
+        jpg_name_without_ext = jpg.split(".")[0]
+        img = cv2.imread(r"{0}".format(path + jpg))
+        sn_w = 530 + self.width_less
+        sn_y = 154 + self.height_less
+        sn_height = 200
+        sn_width = 260
+        crop_img = img[int(sn_y * self.index_h): int((sn_y + sn_height) * self.index_h),
+                   int(sn_w * self.index_w): int((sn_w + sn_width) * self.index_w)]
+        png_name, png_path = self._label2picture(path, crop_img, "no", jpg_name_without_ext)
+        upload_oss = self._upload_oss(png_name, png_path)
+        if upload_oss["code"] == 200:
+            jpg_url = upload_oss["jpg_url"]
+            response = requests.get(
+                "https://jinrui.sanbinit.cn/api/ocr/mock_ocr_response?image_url={0}&image_type={1}".format(jpg_url,
+                                                                                                           "2"))
+            print(response.content)
+            content = json.loads(response.content)
+            if content["data"]["err"] not in ["848", "849"]:
+                value = content["data"]["values"]
+                png_status = "301"
+            else:
+                value = None
+                png_status = "303"
+            return {
+                "png_result": value,
+                "png_url": upload_oss["jpg_url"],
+                "png_status": png_status,
+                "png_type": "29"
+            }
+        else:
+            return {
+                "png_result": None,
+                "png_url": None,
+                "png_status": None,
+                "png_type": None
+            }
+
+    def _cut_select(self, path, jpg, sheet):
         """
         剪切单选
         """
-        for sheet in sheet_json:
-            if sheet["type"] == "select":
-                page = sheet["page"]
-                for name in name_dir:
-                    i = 0
-                    jpg_name = name + "-" + str(i + page) + ".jpg"
-                    while jpg_name in jpg_dir:
-                        select_x = sheet["dot"][0]
-                        select_y = sheet["dot"][1]
-                        img = cv2.imread(path + "\\" + jpg_name)
-                        j = 0
-                        while j < sheet["num"]:
-                            up = 26.37 + (j % 5) * sheet["every_height"] + self.height_less
-                            left = (int(j / 5)) * sheet["every_width"] + self.width_less
-                            print(int((select_y + up) * self.index_h))
-                            print(int((select_x + left) * self.index_w))
-                            crop_img = img[int((select_y + up) * self.index_h): int(
-                                (select_y + sheet["every_height"] + up) * self.index_h),
-                                       int((select_x + left) * self.index_w): int(
-                                           (select_x + left + sheet["every_width"]) * self.index_w)]
-                            self._label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"], str(int(i / 4)),
-                                                                             str(sheet["index"] + 1), str(j + 1)),
-                                          name)
-                            j = j + 1
+        jpg_name_without_ext = jpg.split(".")[0]
+        select_x = sheet["dot"][0]
+        select_y = sheet["dot"][1]
+        print(path + jpg)
+        img = cv2.imread(path + jpg)
+        j = 0
+        select_list = []
+        while j < sheet["num"]:
+            up = 26.37 + (j % 5) * sheet["every_height"] + self.height_less
+            left = (int(j / 5)) * sheet["every_width"] + self.width_less
 
-                        i = i + 4
-                        jpg_name = name + "-" + str(i + page) + ".jpg"
+            crop_img = img[int((select_y + up) * self.index_h): int(
+                (select_y + sheet["every_height"] + up) * self.index_h),
+                       int((select_x + left) * self.index_w): int(
+                           (select_x + left + sheet["every_width"]) * self.index_w)]
+
+            png_name, png_path = self._label2picture(path, crop_img, "{0}-{1}".format(sheet["type"], str(j + 1)),
+                                                     jpg_name_without_ext)
+            upload_oss = self._upload_oss(png_name, png_path)
+            if upload_oss["code"] == 200:
+                jpg_url = upload_oss["jpg_url"]
+                response = requests.get(
+                    "https://jinrui.sanbinit.cn/api/ocr/mock_ocr_response?image_url={0}&image_type={1}".format(jpg_url,
+                                                                                                               "0"))
+                print(response.content)
+                content = json.loads(response.content)
+                if content["data"]["err"] not in ["848", "849"]:
+                    value = content["data"]["values"]
+                    png_status = "301"
+                else:
+                    value = None
+                    png_status = "303"
+                select_dict = {
+                    "question_number": j + 1,
+                    "png_result": value,
+                    "png_url": upload_oss["jpg_url"],
+                    "png_status": png_status,
+                    "png_type": "21"
+                }
+            else:
+                select_dict = {
+                    "question_number": j + 1,
+                    "png_result": None,
+                    "png_url": None,
+                    "png_status": None,
+                    "png_type": None
+                }
+            select_list.append(select_dict)
+            j = j + 1
+        return select_list
 
     # 剪裁多选
-    def _cut_multi(self, sheet_json, name_dir, jpg_dir, path):
+    def _cut_multi(self, path, jpg, sheet):
         """
         剪裁多选
         """
-        for sheet in sheet_json:
-            if sheet["type"] == "multi":
-                page = sheet["page"]
-                for name in name_dir:
-                    i = 0
-                    jpg_name = name + "-" + str(i + page) + ".jpg"
-                    while jpg_name in jpg_dir:
-                        select_x = sheet["dot"][0]
-                        select_y = sheet["dot"][1]
-                        img = cv2.imread(path + "\\" + jpg_name)
-                        j = 0
-                        while j < sheet["num"]:
-                            up = 26.37 + (j % 5) * sheet["every_height"] + self.height_less
-                            left = (int(j / 5)) * sheet["every_width"] + self.width_less
-                            print(int((select_y + up) * self.index_h))
-                            print(int((select_x + left) * self.index_w))
-                            crop_img = img[int((select_y + up) * self.index_h): int(
-                                (select_y + sheet["every_height"] + up) * self.index_h),
-                                       int((select_x + left) * self.index_w): int(
-                                           (select_x + left + sheet["every_width"]) * self.index_w)]
-                            self._label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"], str(int(i / 4)),
-                                                                             str(sheet["index"] + 1), str(j + 1)),
-                                          name)
-                            j = j + 1
+        jpg_name_without_ext = jpg.split(".")[0]
+        select_x = sheet["dot"][0]
+        select_y = sheet["dot"][1]
+        img = cv2.imread(path + jpg)
+        j = 0
+        select_list = []
+        while j < sheet["num"]:
+            up = 26.37 + (j % 5) * sheet["every_height"] + self.height_less
+            left = (int(j / 5)) * sheet["every_width"] + self.width_less
+            crop_img = img[int((select_y + up) * self.index_h): int(
+                (select_y + sheet["every_height"] + up) * self.index_h),
+                       int((select_x + left) * self.index_w): int(
+                           (select_x + left + sheet["every_width"]) * self.index_w)]
+            png_name, png_path = self._label2picture(path, crop_img, "{0}-{1}".format(sheet["type"], str(j + 1)),
+                                                     jpg_name_without_ext)
+            upload_oss = self._upload_oss(png_name, png_path)
+            if upload_oss["code"] == 200:
+                jpg_url = upload_oss["jpg_url"]
+                response = requests.get(
+                    "https://jinrui.sanbinit.cn/api/ocr/mock_ocr_response?image_url={0}&image_type={1}".format(jpg_url,
+                                                                                                               "1"))
+                print(response.content)
+                content = json.loads(response.content)
+                if content["data"]["err"] not in ["848", "849"]:
+                    value = content["data"]["values"]
+                    png_status = "301"
+                else:
+                    value = None
+                    png_status = "303"
+                select_dict = {
+                    "question_number": j + 1,
+                    "png_result": value,
+                    "png_url": upload_oss["jpg_url"],
+                    "png_status": png_status,
+                    "png_type": "22"
+                }
+            else:
+                select_dict = {
+                    "question_number": j + 1,
+                    "png_result": None,
+                    "png_url": None,
+                    "png_status": None,
+                    "png_type": None
+                }
+            select_list.append(select_dict)
+            j = j + 1
+        return select_list
 
-                        i = i + 4
-                        jpg_name = name + "-" + str(i + page) + ".jpg"
-
-    def _cut_judge(self, sheet_json, name_dir, jpg_dir, path):
+    def _cut_judge(self, path, jpg, sheet):
         """
         剪裁判断
         """
-        for sheet in sheet_json:
-            if sheet["type"] == "judge":
-                page = sheet["page"]
-                for name in name_dir:
-                    i = 0
-                    jpg_name = name + "-" + str(i + page) + ".jpg"
-                    while jpg_name in jpg_dir:
-                        select_x = sheet["dot"][0]
-                        select_y = sheet["dot"][1]
-                        img = cv2.imread(path + "\\" + jpg_name)
-                        j = 0
-                        while j < sheet["num"]:
-                            up = 26.37 + (j % 5) * sheet["every_height"] + self.height_less
-                            left = (int(j / 5)) * sheet["every_width"] + self.width_less
-                            print(int((select_y + up) * self.index_h))
-                            print(int((select_x + left) * self.index_w))
-                            crop_img = img[int((select_y + up) * self.index_h): int(
-                                (select_y + sheet["every_height"] + up) * self.index_h),
-                                       int((select_x + left) * self.index_w): int(
-                                           (select_x + left + sheet["every_width"]) * self.index_w)]
-                            self._label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"], str(int(i / 4)),
-                                                                             str(sheet["index"] + 1), str(j + 1)),
-                                          name)
-                            j = j + 1
+        jpg_name_without_ext = jpg.split(".")[0]
+        select_x = sheet["dot"][0]
+        select_y = sheet["dot"][1]
+        img = cv2.imread(path + jpg)
+        j = 0
+        select_list = []
+        while j < sheet["num"]:
+            up = 26.37 + (j % 5) * sheet["every_height"] + self.height_less
+            left = (int(j / 5)) * sheet["every_width"] + self.width_less
+            crop_img = img[int((select_y + up) * self.index_h): int(
+                (select_y + sheet["every_height"] + up) * self.index_h),
+                       int((select_x + left) * self.index_w): int(
+                           (select_x + left + sheet["every_width"]) * self.index_w)]
+            png_name, png_path = self._label2picture(path, crop_img, "{0}-{1}".format(sheet["type"], str(j + 1)),
+                                                     jpg_name_without_ext)
+            upload_oss = self._upload_oss(png_name, png_path)
+            if upload_oss["code"] == 200:
+                jpg_url = upload_oss["jpg_url"]
+                response = requests.get(
+                    "https://jinrui.sanbinit.cn/api/ocr/mock_ocr_response?image_url={0}&image_type={1}".format(jpg_url,
+                                                                                                               "3"))
+                print(response.content)
+                content = json.loads(response.content)
+                if content["data"]["err"] not in ["848", "849"]:
+                    value = content["data"]["values"]
+                    png_status = "301"
+                else:
+                    value = None
+                    png_status = "303"
+                select_dict = {
+                    "question_number": j + 1,
+                    "png_result": value,
+                    "png_url": upload_oss["jpg_url"],
+                    "png_status": png_status,
+                    "png_type": "23"
+                }
+            else:
+                select_dict = {
+                    "question_number": j + 1,
+                    "png_result": None,
+                    "png_url": None,
+                    "png_status": None,
+                    "png_type": None
+                }
+            select_list.append(select_dict)
+            j = j + 1
+        return select_list
 
-                        i = i + 4
-                        jpg_name = name + "-" + str(i + page) + ".jpg"
-
-    def cut_fill_all(self, sheet_json, name_dir, jpg_dir, path):
+    def _cut_fill_all(self, path, jpg, sheet):
         """
         全量剪裁填空
         """
-        for sheet in sheet_json:
-            if sheet["type"] == "fill":
-                page = sheet["page"]
-                for name in name_dir:
-                    i = 0
-                    jpg_name = name + "-" + str(i + page) + ".jpg"
-                    while jpg_name in jpg_dir:
-                        select_x = sheet["dot"][0] + self.width_less
-                        select_y = sheet["dot"][1] + self.height_less
-                        img = cv2.imread(path + "\\" + jpg_name)
-                        crop_img = img[int(select_y * self.index_h): int(
-                            (select_y + sheet["height"]) * self.index_h),
-                                   int(select_x * self.index_w): int(
-                                       (select_x + sheet["width"]) * self.index_w)]
-                        self._label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"] + "all", str(int(i / 4)),
-                                                                         str(sheet["index"] + 1), str(1)), name)
+        jpg_name_without_ext = jpg.split(".")[0]
+        select_x = sheet["dot"][0] + self.width_less
+        select_y = sheet["dot"][1] + self.height_less
+        img = cv2.imread(path + jpg)
+        crop_img = img[int(select_y * self.index_h): int(
+            (select_y + sheet["height"]) * self.index_h),
+                   int(select_x * self.index_w): int(
+                       (select_x + sheet["width"]) * self.index_w)]
+        png_name, png_path = self._label2picture(path, crop_img, "{0}-{1}".format(sheet["type"], sheet["start"]),
+                                                 jpg_name_without_ext)
+        upload_oss = self._upload_oss(png_name, png_path)
+        if upload_oss["code"] == 200:
+            return {
+                "png_result": None,
+                "png_url": upload_oss["jpg_url"],
+                "png_status": None,
+                "png_type": "24"
+            }
+        else:
+            return {
+                "png_result": None,
+                "png_url": None,
+                "png_status": None,
+                "png_type": None
+            }
 
-                        i = i + 4
-                        jpg_name = name + "-" + str(i + page) + ".jpg"
-
-    def _cut_fill_ocr(self, sheet_json, name_dir, jpg_dir, path):
+    def _cut_fill_ocr(self, path, jpg, sheet):
         """
         剪裁填空题ocr识别区域
         """
-        for sheet in sheet_json:
-            if sheet["type"] == "fill":
-                page = sheet["page"]
-                for name in name_dir:
-                    i = 0
-                    jpg_name = name + "-" + str(i + page) + ".jpg"
-                    while jpg_name in jpg_dir:
-                        select_x = sheet["score_dot"][0] + self.width_less
-                        select_y = sheet["score_dot"][1] + self.height_less
-                        img = cv2.imread(path + "\\" + jpg_name)
-                        crop_img = img[int(select_y * self.index_h): int(
-                            (select_y + sheet["score_height"]) * self.index_h),
-                                   int(select_x * self.index_w): int(
-                                       (select_x + sheet["score_width"]) * self.index_w)]
-                        self._label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"] + "ocr", str(int(i / 4)),
-                                                                         str(sheet["index"] + 1), str(1)), name)
+        jpg_name_without_ext = jpg.split(".")[0]
+        select_x = sheet["score_dot"][0] + self.width_less
+        select_y = sheet["score_dot"][1] + self.height_less
+        img = cv2.imread(path + jpg)
+        crop_img = img[int(select_y * self.index_h): int(
+            (select_y + sheet["score_height"]) * self.index_h),
+                   int(select_x * self.index_w): int(
+                       (select_x + sheet["score_width"]) * self.index_w)]
+        png_name, png_path = self._label2picture(path, crop_img, "{0}-{1}".format(sheet["type"] + "-ocr", sheet["start"]),
+                                                 jpg_name_without_ext)
+        upload_oss = self._upload_oss(png_name, png_path)
+        if upload_oss["code"] == 200:
+            jpg_url = upload_oss["jpg_url"]
+            response = requests.get(
+                "https://jinrui.sanbinit.cn/api/ocr/mock_ocr_response?image_url={0}&image_type={1}".format(jpg_url,
+                                                                                                           "4"))
+            print(response.content)
+            content = json.loads(response.content)
+            if content["data"]["err"] not in ["848", "849"]:
+                value = content["data"]["values"]
+                png_status = "301"
+            else:
+                value = None
+                png_status = "303"
+            return {
+                "png_result": value,
+                "png_url": upload_oss["jpg_url"],
+                "png_status": png_status,
+                "png_type": "25"
+            }
+        else:
+            return {
+                "png_result": None,
+                "png_url": None,
+                "png_status": None,
+                "png_type": None
+            }
 
-                        i = i + 4
-                        jpg_name = name + "-" + str(i + page) + ".jpg"
-
-    def _cut_answer_all(self, sheet_json, name_dir, jpg_dir, path):
+    def _cut_answer_all(self, path, jpg, sheet):
         """
         全量剪裁简答题
         """
-        for sheet in sheet_json:
-            if sheet["type"] == "answer":
-                page = sheet["page"]
-                for name in name_dir:
-                    i = 0
-                    jpg_name = name + "-" + str(i + page) + ".jpg"
-                    while jpg_name in jpg_dir:
-                        select_x = sheet["dot"][0] + self.width_less
-                        select_y = sheet["dot"][1] + self.height_less
-                        img = cv2.imread(path + "\\" + jpg_name)
-                        crop_img = img[int(select_y * self.index_h): int(
-                            (select_y + sheet["height"]) * self.index_h),
-                                   int(select_x * self.index_w): int(
-                                       (select_x + sheet["width"]) * self.index_w)]
-                        self._label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"] + "all", str(int(i / 4)),
-                                                                         str(sheet["index"] + 1), str(1)), name)
+        jpg_name_without_ext = jpg.split(".")[0]
+        select_x = sheet["dot"][0] + self.width_less
+        select_y = sheet["dot"][1] + self.height_less
+        img = cv2.imread(path + jpg)
+        crop_img = img[int(select_y * self.index_h): int(
+            (select_y + sheet["height"]) * self.index_h),
+                   int(select_x * self.index_w): int(
+                       (select_x + sheet["width"]) * self.index_w)]
+        png_name, png_path = self._label2picture(path, crop_img, "{0}-{1}".format(sheet["type"], sheet["start"]),
+                                                 jpg_name_without_ext)
+        upload_oss = self._upload_oss(png_name, png_path)
+        if upload_oss["code"] == 200:
+            return {
+                "png_result": None,
+                "png_url": upload_oss["jpg_url"],
+                "png_status": None,
+                "png_type": "26"
+            }
+        else:
+            return {
+                "png_result": None,
+                "png_url": None,
+                "png_status": None,
+                "png_type": None
+            }
 
-                        i = i + 4
-                        jpg_name = name + "-" + str(i + page) + ".jpg"
-
-    def _cut_answer_ocr(self, sheet_json, name_dir, jpg_dir, path):
+    def _cut_answer_ocr(self, path, jpg, sheet):
         """
         剪裁简答题ocr识别区域
         """
-        for sheet in sheet_json:
-            if sheet["type"] == "answer":
-                page = sheet["page"]
-                for name in name_dir:
-                    i = 0
-                    jpg_name = name + "-" + str(i + page) + ".jpg"
-                    while jpg_name in jpg_dir:
-                        select_x = sheet["score_dot"][0] + self.width_less
-                        select_y = sheet["score_dot"][1] + self.height_less
-                        img = cv2.imread(path + "\\" + jpg_name)
-                        crop_img = img[int(select_y * self.index_h): int(
-                            (select_y + sheet["score_height"]) * self.index_h),
-                                   int(select_x * self.index_w): int(
-                                       (select_x + sheet["score_width"]) * self.index_w)]
-                        self._label2picture(crop_img, "{0}-{1}-{2}-{3}".format(sheet["type"] + "ocr", str(int(i / 4)),
-                                                                         str(sheet["index"] + 1), str(1)), name)
+        jpg_name_without_ext = jpg.split(".")[0]
+        select_x = sheet["score_dot"][0] + self.width_less
+        select_y = sheet["score_dot"][1] + self.height_less
+        img = cv2.imread(path + jpg)
+        crop_img = img[int(select_y * self.index_h): int(
+            (select_y + sheet["score_height"]) * self.index_h),
+                   int(select_x * self.index_w): int(
+                       (select_x + sheet["score_width"]) * self.index_w)]
+        png_name, png_path = self._label2picture(path, crop_img,
+                                                 "{0}-{1}".format(sheet["type"] + "-ocr", sheet["start"]),
+                                                 jpg_name_without_ext)
+        upload_oss = self._upload_oss(png_name, png_path)
+        if upload_oss["code"] == 200:
+            jpg_url = upload_oss["jpg_url"]
+            response = requests.get(
+                "https://jinrui.sanbinit.cn/api/ocr/mock_ocr_response?image_url={0}&image_type={1}".format(jpg_url,
+                                                                                                           "4"))
+            print(response.content)
+            content = json.loads(response.content)
+            if content["data"]["err"] not in ["848", "849"]:
+                value = content["data"]["values"]
+                png_status = "301"
+            else:
+                value = None
+                png_status = "303"
+            return {
+                "png_result": value,
+                "png_url": upload_oss["jpg_url"],
+                "png_status": png_status,
+                "png_type": "27"
+            }
+        else:
+            return {
+                "png_result": None,
+                "png_url": None,
+                "png_status": None,
+                "png_type": None
+            }
 
-                        i = i + 4
-                        jpg_name = name + "-" + str(i + page) + ".jpg"
+    def _get_all_org_behind_id(self, org_id):
+        """
+        根据某个学校org_id获取所有子org_id的list
+        """
+        org_list = []
+
+        # org_list.append(org_id)
+        grade_list = j_organization.query.filter(j_organization.parent_org_id == org_id).all()
+        for grade in grade_list:
+            org_list.append(grade.id)
+        for org in org_list:
+            class_list = j_organization.query.filter(j_organization.parent_org_id == org).all()
+            for class_id in class_list:
+                org_list.append(class_id.id)
+
+        org_list.append(org_id)
+        return org_list
 
 
     def mock_question(self):

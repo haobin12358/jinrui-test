@@ -89,8 +89,8 @@ class CAnswer():
                     pdf_path, pdf_fullname = os.path.split(pdf)
                     pdf_name, pdf_ext = os.path.splitext(pdf_fullname)
                     pdf_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" \
-                              + pdf_name + "-" + pdf_uuid + "." + pdf_ext
-                    result = bucket.put_object_from_file(pdf_name + "-" + pdf_uuid + "." + pdf_ext,
+                              + "pdf-" + pdf_uuid + "." + pdf_ext
+                    result = bucket.put_object_from_file("pdf-" + pdf_uuid + "." + pdf_ext,
                                                          os.path.join(pdf_file, pdf))
                     current_app.logger.info(">>>>>>>>>>>>result:" + str(result.status))
 
@@ -149,6 +149,7 @@ class CAnswer():
         args = parameter_required(("png_status", ))
 
         filter_args = [j_answer_png.isdelete == 0]
+        filter_args.append(j_answer_png.png_type.in_(["21", "22", "23", "25", "27"]))
         if args.get("png_status") == "待处理":
             filter_args.append(j_answer_png.png_status == "303")
         elif args.get("png_status") == "已处理":
@@ -180,13 +181,13 @@ class CAnswer():
         all_answer = j_answer_png.query.filter(*filter_args).all()
 
         total = len(all_answer)
-        size = args.get("size") or 15
+        size = args.get("pageSize") or 15
 
-        if total % size == 0:
+        if total % int(size) == 0:
             if total == 0:
                 pages = 1
             else:
-                pages = total / size
+                pages = total / int(size)
         else:
             pages = int(total / int(size)) + 1
 
