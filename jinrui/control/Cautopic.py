@@ -20,6 +20,7 @@ from jinrui.extensions.register_ext import ali_oss
 
 class CAutopic():
     oss_domain = 'https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com'
+
     def transfordoc(self, filepath):
         current_app.logger.info('get path {}'.format(filepath))
         path = filepath
@@ -180,7 +181,9 @@ class CAutopic():
                     newFile = os.path.join(newPath, img_name)
                     self.draw_pic(tmp_use_str, newFile, eq_index)
                     db_path = '{domain}/img/{folder}/{year}/{month}/{day}/{img_name}'.format(domain=self.oss_domain,
-                        folder='tmp', year=year, month=month, day=day, img_name=img_name)
+                                                                                             folder='tmp', year=year,
+                                                                                             month=month, day=day,
+                                                                                             img_name=img_name)
                     # new_eq_str = "<img src='{0}'></img>".format(db_path)
                     img_eq = Image.open(newFile)
                     x, y = img_eq.size
@@ -249,11 +252,12 @@ class CAutopic():
             # url_response = json_response["data"]["url"]
             # print(">>>>>>>>>>>>>>>>>>url_response:" + str(url_response))
             use_str = use_str.replace(
-                match_str,"<img src='{0}'></img>".format(self.oss_domain + url_response))
+                match_str, "<img src='{0}'></img>".format(self.oss_domain + url_response))
         else:
-            use_str = use_str.replace(match_str,"<img src='{0}'></img>".format(
+            use_str = use_str.replace(match_str, "<img src='{0}'></img>".format(
                 str(target_list[rId_list.index(rId)])))
         return use_str
+
     @staticmethod
     def get_eqcontent(str_eq, index):
         # 获取解析字符串
