@@ -14,8 +14,8 @@ class COcr():
     def __init__(self):
         self.index_h = 1684 / 1124.52
         self.index_w = 1191 / 810.81
-        self.width_less = 6
-        self.height_less = -24
+        self.width_less = 0
+        self.height_less = 0
 
     def mock_ocr_response(self):
         args = parameter_required(("image_url", "image_type"))
