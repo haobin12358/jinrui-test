@@ -119,18 +119,21 @@ class CPpt():
             question_dict = question_answer["question"].split("<div>")
             for question_item in question_dict:
                 if question_item:
-                    question_item = question_item.replace("</div>", "#####").replace("<img src='", "#####").replace(
-                        "'></img>", "#####")
+                    question_item = question_item.replace("</div>", "#####").replace("<img src=\"", "#####").replace(
+                        "></img>", "#####").replace("<img src='", "#####")
                     question_item_dict = question_item.split("#####")
                     width = Inches(1)
                     height = Inches(0.4)
                     for row in question_item_dict:
                         if row:
                             if "https://" in row:
-                                row_dict = row.split("/")
+                                if "\"" in row:
+                                    row = row.split("\"")[0]
+                                row_dict_path = row.replace("{0}{1}.{2}/".format("https://", ALIOSS_BUCKET_NAME, ALIOSS_ENDPOINT), "").replace("\'", "")
+                                row_dict = row_dict_path.split("/")
                                 pic_save_path = pic_path + row_dict[-1]
                                 # 存储图片到本地
-                                bucket.get_object_to_file(row_dict[-1], pic_save_path)
+                                bucket.get_object_to_file(row_dict_path, pic_save_path)
                                 img = cv2.imread(pic_save_path)
                                 pic_width = img.shape[0]
                                 pic_height = img.shape[1]
@@ -197,21 +200,28 @@ class CPpt():
             for answer_item in answer_dict:
                 if answer_item:
                     answer_item = answer_item.replace("</div>", "#####").replace("<img src='", "#####").replace(
-                        "'></img>", "#####")
+                        "></img>", "#####")
                     question_item_dict = answer_item.split("#####")
                     width = Inches(1)
                     height = Inches(0.4)
                     for row in question_item_dict:
                         if row:
                             if "https://" in row:
-                                row_dict = row.split("/")
+                                if "\"" in row:
+                                    row = row.split("\"")[0]
+                                row_dict_path = row.replace(
+                                    "{0}{1}.{2}/".format("https://", ALIOSS_BUCKET_NAME, ALIOSS_ENDPOINT), "").replace("\'", "")
+                                row_dict = row_dict_path.split("/")
                                 pic_save_path = pic_path + row_dict[-1]
-                                bucket.get_object_to_file(row_dict[-1], pic_save_path)
+                                # 存储图片到本地
+                                bucket.get_object_to_file(row_dict_path, pic_save_path)
                                 img = cv2.imread(pic_save_path)
                                 pic_width = img.shape[0]
                                 pic_height = img.shape[1]
+                                # 添加图片到ppt中
                                 pic = slide.shapes.add_picture(pic_save_path, left, top, height=height)
                                 left = left + pic_width * height / pic_height
+                                # 移除图片
                                 os.remove(pic_save_path)
                             else:
                                 width = Inches(len(row) / 4)
