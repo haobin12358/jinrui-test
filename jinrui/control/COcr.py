@@ -1,4 +1,3 @@
-# import sheet
 import os, uuid, oss2, shutil, json, cv2, fitz, platform, requests, re
 from datetime import datetime
 
@@ -21,6 +20,7 @@ class COcr():
     def mock_ocr_response(self):
         args = parameter_required(("image_url", "image_type"))
         model = "/opt/jinrui/jinrui/jinrui/libsheet/models/"
+        import sheet
         d = sheet.Detector(model)
         current_app.logger.info(str(d))
         pic_uuid = str(uuid.uuid1())
@@ -221,7 +221,8 @@ class COcr():
                             "status": booklet_status,
                             "url": pdf.pdf_url,
                             "upload_by": upload_by,
-                            "upload_id": upload_id
+                            "upload_id": upload_id,
+                            "create_time": datetime.now().date()
                         }
                         if student_id and paper_id:
                             for sheet in json.loads(pdf.sheet_dict):
