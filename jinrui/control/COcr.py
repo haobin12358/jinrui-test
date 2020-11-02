@@ -582,6 +582,9 @@ class COcr():
 
                 shutil.rmtree(pdf_path)
 
+        else:
+            current_app.logger.info(">>>>>>>>>>>>>>>>>>>>>>get_pdf_num:0")
+
     def _conver_img(self, pdf_path, pdf_save_path, pdf_name):
         """
         将pdf转化为jpg

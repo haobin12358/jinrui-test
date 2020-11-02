@@ -33,6 +33,14 @@ def cancel_async_task(conn_id):
         conn.delete(conn_id)
         current_app.logger.info(f'取消任务成功 task_id:{exist_task_id}')
 
+@celery.task(name='ocr_fix')
+def ocr_fix():
+    try:
+        from jinrui.control.COcr import COcr
+        cocr = COcr().deal_pdf()
+    except:
+        current_app.logger.info(">>>>>>>>>>>>>>异常的ocr任务")
+
 
 @celery.task(name='auto_setpic')
 def auto_setpic():
