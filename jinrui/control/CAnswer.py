@@ -205,8 +205,9 @@ class CAnswer():
         data = parameter_required(("png_id", "result_update"))
 
         with db.auto_commit():
-            answer_png = j_answer_png.query.filter(j_answer_png.png_id == data.get("png_id")).first_("为找到该记录")
-
+            answer_png = j_answer_png.query.filter(j_answer_png.png_id == data.get("png_id")).first_("未找到该记录")
+            current_app.logger.info(">>>>>>>>>>>>>>>>>>>png:" + str(answer_png))
+            score_id = answer_png.score_id
             answer_instance = answer_png.update({
                 "updatetime": datetime.now(),
                 "result_update": int(data.get("result_update")),
@@ -214,8 +215,6 @@ class CAnswer():
             }, null="not")
 
             db.session.add(answer_instance)
-
-            score_id = answer_png.score_id
             score = j_score.query.filter(j_score.id == score_id).first()
             score_instance = score.update({
                 "status": "304",

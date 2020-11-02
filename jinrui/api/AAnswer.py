@@ -9,7 +9,6 @@ class AAnswer(Resource):
     def post(self, answer):
         apis = {
             'upload_booklet': self.canswer.upload_booklet,
-            'upload_pdf': self.canswer.upload_pdf,
             "update_score": self.canswer.update_score
         }
 
