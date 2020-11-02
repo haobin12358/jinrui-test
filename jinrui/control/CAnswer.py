@@ -9,7 +9,7 @@ from jinrui.extensions.register_ext import db, ali_oss
 from ..extensions.params_validates import parameter_required
 from jinrui.extensions.error_response import ErrorFileType, ErrorAnswerType, ParamsError
 from jinrui.models.jinrui import j_manager, j_answer_zip, j_answer_pdf, j_paper, j_answer_sheet, j_answer_png, \
-    j_role, j_organization, j_school_network, j_answer_upload
+    j_role, j_organization, j_school_network, j_answer_upload, j_score
 from flask import current_app, request
 from sqlalchemy import false
 
@@ -215,7 +215,14 @@ class CAnswer():
 
             db.session.add(answer_instance)
 
-        # TODO 更新考卷情况
+            score_id = answer_png.score_id
+            score = j_score.query.filter(j_score.id == score_id).first()
+            score_instance = score.update({
+                "status": "304",
+                "score": int(data.get("result_update"))
+            }, null="not")
+
+            db.session.add(score_instance)
 
         return {
             "code": 200,

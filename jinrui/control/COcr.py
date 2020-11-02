@@ -1,5 +1,5 @@
 # import sheet
-import os, uuid, oss2, shutil, json, cv2, fitz, platform, requests
+import os, uuid, oss2, shutil, json, cv2, fitz, platform, requests, re
 from datetime import datetime
 
 from ..extensions.success_response import Success
@@ -15,8 +15,8 @@ class COcr():
     def __init__(self):
         self.index_h = 1684 / 1124.52
         self.index_w = 1191 / 810.81
-        self.width_less = 0
-        self.height_less = 0
+        self.width_less = 6
+        self.height_less = -24
 
     def mock_ocr_response(self):
         args = parameter_required(("image_url", "image_type"))
@@ -210,11 +210,15 @@ class COcr():
                         else:
                             paper_id = None
                         # 封装某个学生的某套答卷dict
+                        if pdf.pdf_use == "300201":
+                            booklet_status = "已分配"
+                        else:
+                            booklet_status = "待分配"
                         booklet_dict = {
                             "id": booklet_id,
                             "paper_id": paper_id,
                             "student_id": student_id,
-                            "status": "1",
+                            "status": booklet_status,
                             "url": pdf.pdf_url,
                             "upload_by": upload_by,
                             "upload_id": upload_id
@@ -223,6 +227,7 @@ class COcr():
                             for sheet in json.loads(pdf.sheet_dict):
                                 # jpg路径
                                 # jpg_path = pdf_path + jpg_dict[sheet["page"] - 1]
+                                point = "．"
                                 if sheet["type"] == "select":
                                     select_list = self._cut_select(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
                                     with db.auto_commit():
@@ -231,6 +236,21 @@ class COcr():
                                             question = j_question.query.filter(j_question.paper_id == paper_id,
                                                                                j_question.question_number == str(question_number))\
                                                 .first()
+                                            start_re = "<div>{0}{1}".format(question_number, point)
+                                            if "【解析】" in question.answer:
+                                                end_re = "【解析】"
+                                                use_str_e = re.findall(r"{0}".format("{0}.*?{1}".format(start_re, end_re)), question.answer)[0]
+                                                use_str = use_str_e.replace(start_re, "").replace(end_re, "").replace(" ", "")
+                                            else:
+                                                use_str = question.answer.replace(start_re, "").replace(" ", "")
+                                            if use_str == str(select.get("png_result")):
+                                                score = sheet["score"]
+                                            else:
+                                                score = 0
+                                            if select.get("png_status") == "303":
+                                                png_status = "303"
+                                            else:
+                                                png_status = "304"
                                             score_id = str(uuid.uuid1())
                                             score_dict = {
                                                 "id": score_id,
@@ -239,9 +259,9 @@ class COcr():
                                                 "question_id": question.id,
                                                 "grade_by": "system-ocr",
                                                 "question_number": question_number,
-                                                "score": 0,
+                                                "score": score,
                                                 "question_url": select.get("png_url"),
-                                                "status": "304"
+                                                "status": png_status
                                             }
                                             select_dict = {
                                                 "isdelete": 0,
@@ -258,9 +278,10 @@ class COcr():
                                                 "student_no": no,
                                                 "student_name": student_name,
                                                 "school": school_name,
-                                                "result_score": 0,
-                                                "result_update": 0,
-                                                "score_id": score_id
+                                                "result_score": score,
+                                                "result_update": score,
+                                                "score_id": score_id,
+                                                "question": question.content
                                             }
                                             select_instance = j_answer_png.create(select_dict)
                                             db.session.add(select_instance)
@@ -275,6 +296,24 @@ class COcr():
                                                                                j_question.question_number == str(
                                                                                    question_number)) \
                                                 .first()
+                                            start_re = "<div>{0}{1}".format(question_number, point)
+                                            if "【解析】" in question.answer:
+                                                end_re = "【解析】"
+                                                use_str_e = \
+                                                re.findall(r"{0}".format("{0}.*?{1}".format(start_re, end_re)),
+                                                           question.answer)[0]
+                                                use_str = use_str_e.replace(start_re, "").replace(end_re, "").replace(
+                                                    " ", "")
+                                            else:
+                                                use_str = question.answer.replace(start_re, "").replace(" ", "")
+                                            if use_str == str(select.get("png_result")):
+                                                score = sheet["score"]
+                                            else:
+                                                score = 0
+                                            if select.get("png_status") == "303":
+                                                png_status = "303"
+                                            else:
+                                                png_status = "304"
                                             score_id = str(uuid.uuid1())
                                             score_dict = {
                                                 "id": score_id,
@@ -283,9 +322,9 @@ class COcr():
                                                 "question_id": question.id,
                                                 "grade_by": "system-ocr",
                                                 "question_number": question_number,
-                                                "score": 0,
+                                                "score": score,
                                                 "question_url": select.get("png_url"),
-                                                "status": "304"
+                                                "status": png_status
                                             }
                                             select_dict = {
                                                 "isdelete": 0,
@@ -302,9 +341,10 @@ class COcr():
                                                 "student_no": no,
                                                 "student_name": student_name,
                                                 "school": school_name,
-                                                "result_score": 0,
-                                                "result_update": 0,
-                                                "score_id": score_id
+                                                "result_score": score,
+                                                "result_update": score,
+                                                "score_id": score_id,
+                                                "question": question.content
                                             }
                                             select_instance = j_answer_png.create(select_dict)
                                             db.session.add(select_instance)
@@ -319,6 +359,24 @@ class COcr():
                                                                                j_question.question_number == str(
                                                                                    question_number)) \
                                                 .first()
+                                            start_re = "<div>{0}{1}".format(question_number, point)
+                                            if "【解析】" in question.answer:
+                                                end_re = "【解析】"
+                                                use_str_e = \
+                                                re.findall(r"{0}".format("{0}.*?{1}".format(start_re, end_re)),
+                                                           question.answer)[0]
+                                                use_str = use_str_e.replace(start_re, "").replace(end_re, "").replace(
+                                                    " ", "")
+                                            else:
+                                                use_str = question.answer.replace(start_re, "").replace(" ", "")
+                                            if use_str == str(select.get("png_result")):
+                                                score = sheet["score"]
+                                            else:
+                                                score = 0
+                                            if select.get("png_status") == "303":
+                                                png_status = "303"
+                                            else:
+                                                png_status = "304"
                                             score_id = str(uuid.uuid1())
                                             score_dict = {
                                                 "id": score_id,
@@ -327,9 +385,9 @@ class COcr():
                                                 "question_id": question.id,
                                                 "grade_by": "system-ocr",
                                                 "question_number": question_number,
-                                                "score": 0,
+                                                "score": score,
                                                 "question_url": select.get("png_url"),
-                                                "status": "304"
+                                                "status": png_status
                                             }
                                             select_dict = {
                                                 "isdelete": 0,
@@ -346,9 +404,10 @@ class COcr():
                                                 "student_no": no,
                                                 "student_name": student_name,
                                                 "school": school_name,
-                                                "result_score": 0,
-                                                "result_update": 0,
-                                                "score_id": score_id
+                                                "result_score": score,
+                                                "result_update": score,
+                                                "score_id": score_id,
+                                                "question": question.content
                                             }
                                             select_instance = j_answer_png.create(select_dict)
                                             db.session.add(select_instance)
@@ -364,6 +423,14 @@ class COcr():
                                     if pdf.pdf_use == "300201":
                                         fill_dict_ocr = self._cut_fill_ocr(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
                                         fill_dict = self._cut_fill_all(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
+                                        if fill_dict_ocr.get("png_result"):
+                                            png_score = int(fill_dict_ocr.get("png_result"))
+                                        else:
+                                            png_score = 0
+                                        if fill_dict_ocr.get("png_status") == "303":
+                                            png_status = "303"
+                                        else:
+                                            png_status = "304"
                                         score_dict = {
                                             "id": score_id,
                                             "student_id": student_id,
@@ -371,9 +438,9 @@ class COcr():
                                             "question_id": question.id,
                                             "grade_by": "system-ocr",
                                             "question_number": question_number,
-                                            "score": 0,
+                                            "score": png_score,
                                             "question_url": fill_dict.get("png_url"),
-                                            "status": "304"
+                                            "status": png_status
                                         }
                                         select_dict = {
                                             "isdelete": 0,
@@ -390,9 +457,10 @@ class COcr():
                                             "student_no": no,
                                             "student_name": student_name,
                                             "school": school_name,
-                                            "result_score": 0,
-                                            "result_update": 0,
-                                            "score_id": score_id
+                                            "result_score": png_score,
+                                            "result_update": png_score,
+                                            "score_id": score_id,
+                                            "question": question.content
                                         }
                                     else:
                                         fill_dict = self._cut_fill_all(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
@@ -403,7 +471,7 @@ class COcr():
                                             "question_id": question.id,
                                             "grade_by": "system-ocr",
                                             "question_number": question_number,
-                                            "score": 0,
+                                            "score": None,
                                             "question_url": fill_dict.get("png_url"),
                                             "status": "302"
                                         }
@@ -424,7 +492,16 @@ class COcr():
 
                                     answer_dict_ocr = self._cut_answer_ocr(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
                                     answer_dict = self._cut_answer_all(pdf_path, jpg_dict[sheet["page"] - 1], sheet)
+                                    if answer_dict_ocr.get("png_result"):
+                                        png_score = int(answer_dict_ocr.get("png_result"))
+                                    else:
+                                        png_score = 0
+                                    if answer_dict_ocr.get("png_status") == "303":
+                                        png_status = "303"
+                                    else:
+                                        png_status = "304"
                                     if pdf.pdf_use == "300201":
+
                                         score_dict = {
                                             "id": score_id,
                                             "student_id": student_id,
@@ -432,9 +509,9 @@ class COcr():
                                             "question_id": question.id,
                                             "grade_by": "system-ocr",
                                             "question_number": question_number,
-                                            "score": 0,
+                                            "score": png_score,
                                             "question_url": answer_dict.get("png_url"),
-                                            "status": "304"
+                                            "status": png_status
                                         }
                                         select_dict = {
                                             "isdelete": 0,
@@ -451,9 +528,10 @@ class COcr():
                                             "student_no": no,
                                             "student_name": student_name,
                                             "school": school_name,
-                                            "result_score": 0,
-                                            "result_update": 0,
-                                            "score_id": score_id
+                                            "result_score": png_score,
+                                            "result_update": png_score,
+                                            "score_id": score_id,
+                                            "question": question.content
                                         }
                                     else:
                                         score_dict = {
@@ -463,7 +541,7 @@ class COcr():
                                             "question_id": question.id,
                                             "grade_by": "system-ocr",
                                             "question_number": question_number,
-                                            "score": 0,
+                                            "score": None,
                                             "question_url": answer_dict.get("png_url"),
                                             "status": "302"
                                         }
@@ -492,8 +570,6 @@ class COcr():
                         jpg_index = jpg_index + 4
 
                 shutil.rmtree(pdf_path)
-
-                return jpg_dir
 
     def _conver_img(self, pdf_path, pdf_save_path, pdf_name):
         """
@@ -567,7 +643,7 @@ class COcr():
         img = cv2.imread(r"{0}".format(path + jpg))
         sn_w = 600 + self.width_less
         sn_y = 40 + self.height_less
-        sn_height = 16
+        sn_height = 20
         sn_width = 135
         crop_img = img[int(sn_y * self.index_h): int((sn_y + sn_height) * self.index_h),
                    int(sn_w * self.index_w): int((sn_w + sn_width) * self.index_w)]
