@@ -57,13 +57,13 @@ class COcr():
                 school_name = school_network.school_name
             else:
                 school_name = pdf.pdf_school
-            print(">>>>>>>>>>>>>>>>>>school_name:" + str(school_name))
+            current_app.logger.info(">>>>>>>>>>>>>>>>>>school_name:" + str(school_name))
             organization = j_organization.query.filter(j_organization.name == school_name,
                                                        j_organization.role_type == "SCHOOL").first()
             org_id = organization.id
             # 组织list，用于判断学生的组织id是否在其中，从而判断学生对应信息
             children_id_list = self._get_all_org_behind_id(org_id)
-            print(">>>>>>>>>>>>>>>>>children_id:" + str(children_id_list))
+            current_app.logger.info(">>>>>>>>>>>>>>>>>children_id:" + str(children_id_list))
 
             upload_id = pdf.upload_id
             pdf_url = pdf.pdf_url
@@ -99,7 +99,7 @@ class COcr():
                     })
                     db.session.add(pdf_instance)
                 jpg_dir = self._conver_img(pdf_path, pdf_save_path, pdf_name[-1])
-                print(jpg_dir)
+                current_app.logger.info(jpg_dir)
 
                 if len(jpg_dir) % 4 != 0:
                     with db.auto_commit():
@@ -141,11 +141,11 @@ class COcr():
                             jpg_url_four = None
                         jpg_oss_list = [jpg_url, jpg_url_two, jpg_url_three, jpg_url_four]
                         # 获取sn
-                        print(pdf_path)
-                        print(jpg_dict[0])
+                        current_app.logger.info(pdf_path)
+                        current_app.logger.info(jpg_dict[0])
                         sn_result = self._cut_sn(pdf_path, jpg_dict[0])
                         sn = sn_result["png_result"]
-                        print(">>>>>>>>>>>>>>>>>>>>>sn:" + str(sn))
+                        current_app.logger.info(">>>>>>>>>>>>>>>>>>>>>sn:" + str(sn))
                         # 获取学号
                         no_result = self._cut_no(pdf_path, jpg_dict[0])
                         no = no_result["png_result"]
@@ -172,7 +172,7 @@ class COcr():
                             "student_name": student_name,
                             "school": school_name
                         }
-                        print(">>>>>>>>>>>>>>>>>>>>>no:" + str(no))
+                        current_app.logger.info(">>>>>>>>>>>>>>>>>>>>>no:" + str(no))
                         with db.auto_commit():
                             png_instance = j_answer_png.create(no_dict)
                             db.session.add(png_instance)
@@ -211,9 +211,9 @@ class COcr():
                             paper_id = None
                         # 封装某个学生的某套答卷dict
                         if pdf.pdf_use == "300201":
-                            booklet_status = "已分配"
+                            booklet_status = "-1"
                         else:
-                            booklet_status = "待分配"
+                            booklet_status = "1"
                         booklet_dict = {
                             "id": booklet_id,
                             "paper_id": paper_id,
@@ -249,6 +249,7 @@ class COcr():
                                                 score = 0
                                             if select.get("png_status") == "303":
                                                 png_status = "303"
+                                                score = None
                                             else:
                                                 png_status = "304"
                                             score_id = str(uuid.uuid1())
@@ -312,6 +313,7 @@ class COcr():
                                                 score = 0
                                             if select.get("png_status") == "303":
                                                 png_status = "303"
+                                                score = None
                                             else:
                                                 png_status = "304"
                                             score_id = str(uuid.uuid1())
@@ -375,6 +377,7 @@ class COcr():
                                                 score = 0
                                             if select.get("png_status") == "303":
                                                 png_status = "303"
+                                                score = None
                                             else:
                                                 png_status = "304"
                                             score_id = str(uuid.uuid1())
@@ -429,6 +432,7 @@ class COcr():
                                             png_score = 0
                                         if fill_dict_ocr.get("png_status") == "303":
                                             png_status = "303"
+                                            png_score = None
                                         else:
                                             png_status = "304"
                                         score_dict = {
@@ -498,6 +502,7 @@ class COcr():
                                         png_score = 0
                                     if answer_dict_ocr.get("png_status") == "303":
                                         png_status = "303"
+                                        png_score = None
                                     else:
                                         png_status = "304"
                                     if pdf.pdf_use == "300201":
@@ -554,6 +559,12 @@ class COcr():
                                         db.session.add(score_instance)
 
                             with db.auto_commit():
+                                if pdf.pdf_use == "300201":
+                                    answer_png_with_status = j_answer_png.query.filter(j_answer_png.booklet_id == booklet_id, j_answer_png.png_status == "303").all()
+                                    if answer_png_with_status:
+                                        booklet_dict["status"] = "3"
+                                    else:
+                                        booklet_dict["status"] = "4"
                                 booklet_instance = j_answer_booklet.create(booklet_dict)
                                 db.session.add(booklet_instance)
                                 pdf_instance = pdf.update({
@@ -564,7 +575,7 @@ class COcr():
                                 if not pdf_error_status:
                                     upload = j_answer_upload.query.filter(j_answer_upload.id == upload_id).first()
                                     upload_instance = upload.update({
-                                        "status": "待分配"
+                                        "status": "1"
                                     })
                                     db.session.add(upload_instance)
                         jpg_index = jpg_index + 4
@@ -654,7 +665,7 @@ class COcr():
         if upload_oss["code"] == 200:
             jpg_url = upload_oss["jpg_url"]
             response = requests.get("https://jinrui.sanbinit.cn/api/ocr/mock_ocr_response?image_url={0}&image_type={1}".format(jpg_url, "5"))
-            print(response.content)
+            current_app.logger.info(response.content)
             content = json.loads(response.content)
             if content["data"]["err"] not in ["848", "849"]:
                 value = content["data"]["values"]
@@ -695,7 +706,7 @@ class COcr():
             response = requests.get(
                 "https://jinrui.sanbinit.cn/api/ocr/mock_ocr_response?image_url={0}&image_type={1}".format(jpg_url,
                                                                                                            "2"))
-            print(response.content)
+            current_app.logger.info(response.content)
             content = json.loads(response.content)
             if content["data"]["err"] not in ["848", "849"]:
                 value = content["data"]["values"]
@@ -724,7 +735,7 @@ class COcr():
         jpg_name_without_ext = jpg.split(".")[0]
         select_x = sheet["dot"][0]
         select_y = sheet["dot"][1]
-        print(path + jpg)
+        current_app.logger.info(path + jpg)
         img = cv2.imread(path + jpg)
         j = 0
         select_list = []
@@ -745,7 +756,7 @@ class COcr():
                 response = requests.get(
                     "https://jinrui.sanbinit.cn/api/ocr/mock_ocr_response?image_url={0}&image_type={1}".format(jpg_url,
                                                                                                                "0"))
-                print(response.content)
+                current_app.logger.info(response.content)
                 content = json.loads(response.content)
                 if content["data"]["err"] not in ["848", "849"]:
                     value = content["data"]["values"]
@@ -798,7 +809,7 @@ class COcr():
                 response = requests.get(
                     "https://jinrui.sanbinit.cn/api/ocr/mock_ocr_response?image_url={0}&image_type={1}".format(jpg_url,
                                                                                                                "1"))
-                print(response.content)
+                current_app.logger.info(response.content)
                 content = json.loads(response.content)
                 if content["data"]["err"] not in ["848", "849"]:
                     value = content["data"]["values"]
@@ -850,7 +861,7 @@ class COcr():
                 response = requests.get(
                     "https://jinrui.sanbinit.cn/api/ocr/mock_ocr_response?image_url={0}&image_type={1}".format(jpg_url,
                                                                                                                "3"))
-                print(response.content)
+                current_app.logger.info(response.content)
                 content = json.loads(response.content)
                 if content["data"]["err"] not in ["848", "849"]:
                     value = content["data"]["values"]
@@ -927,7 +938,7 @@ class COcr():
             response = requests.get(
                 "https://jinrui.sanbinit.cn/api/ocr/mock_ocr_response?image_url={0}&image_type={1}".format(jpg_url,
                                                                                                            "4"))
-            print(response.content)
+            current_app.logger.info(response.content)
             content = json.loads(response.content)
             if content["data"]["err"] not in ["848", "849"]:
                 value = content["data"]["values"]
@@ -1000,7 +1011,7 @@ class COcr():
             response = requests.get(
                 "https://jinrui.sanbinit.cn/api/ocr/mock_ocr_response?image_url={0}&image_type={1}".format(jpg_url,
                                                                                                            "4"))
-            print(response.content)
+            current_app.logger.info(response.content)
             content = json.loads(response.content)
             if content["data"]["err"] not in ["848", "849"]:
                 value = content["data"]["values"]
