@@ -16,6 +16,7 @@ class COcr():
         self.index_w = 1191 / 810.81
         self.width_less = 0
         self.height_less = 0
+        self.jpg_list = []
 
     def mock_ocr_response(self):
         args = parameter_required(("image_url", "image_type"))
@@ -593,6 +594,7 @@ class COcr():
         doc = fitz.Document(pdf_save_path)
         pdf_name_without_ext = pdf_name.split(".")[0]
         i = 1
+        jpg_dir = []
         for pg in range(doc.pageCount):
             page = doc[pg]
             rotate = int(0)
@@ -602,16 +604,12 @@ class COcr():
             trans = fitz.Matrix(zoom_x, zoom_y).preRotate(rotate)
             pm = page.getPixmap(matrix=trans, alpha=False)
             if platform.system() == "Windows":
-                pm.writePNG(pdf_path + '\\{0}-{1}.jpg'.format(pdf_name_without_ext, "%04d" % i))
+                pm.writePNG(pdf_path + '{0}-{1}.jpg'.format(pdf_name_without_ext, "%04d" % i))
+                jpg_dir.append('{0}-{1}.jpg'.format(pdf_name_without_ext, "%04d" % i))
             else:
-                pm.writePNG(pdf_path + '/{0}-{1}.jpg'.format(pdf_name_without_ext, "%04d" % i))
+                pm.writePNG(pdf_path + '{0}-{1}.jpg'.format(pdf_name_without_ext, "%04d" % i))
+                jpg_dir.append('{0}-{1}.jpg'.format(pdf_name_without_ext, "%04d" % i))
             i = i + 1
-
-        jpg_dir = []
-        documents = os.listdir(pdf_path)
-        for document in documents:
-            if os.path.splitext(document)[1] == ".jpg":
-                jpg_dir.append(document)
 
         return jpg_dir
 
@@ -644,7 +642,7 @@ class COcr():
 
         jpg_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + file_fullname + "-" + jpg_uuid + "." + ext
         result = bucket.put_object_from_file(file_fullname + "-" + jpg_uuid + "." + ext, file_path)
-
+        current_app.logger.info(str(result))
         return {
             "code": result.status,
             "jpg_url": jpg_url
@@ -657,7 +655,7 @@ class COcr():
         jpg_name_without_ext = jpg.split(".")[0]
         img = cv2.imread(r"{0}".format(path + jpg))
         sn_w = 600 + self.width_less
-        sn_y = 40 + self.height_less
+        sn_y = 35 + self.height_less
         sn_height = 20
         sn_width = 135
         crop_img = img[int(sn_y * self.index_h): int((sn_y + sn_height) * self.index_h),
