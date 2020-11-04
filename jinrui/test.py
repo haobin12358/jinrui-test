@@ -163,7 +163,8 @@ def main(inc=60):
 # sp = ScanPdf()
 # path = r'D:\teamsystem\jinrui-test\img\pdf\2020\10\30\DmU5LJ5GiH7oiWq4rGlL.pdf'
 # sp.upload_pdf('0', 'test', path, 'DmU5LJ5GiH7oiWq4rGlL.pdf')
-main()
+if __name__ == '__main__':
+    main()
 # local test
 # base_bath = os.getcwd()
 # cfg_path = os.path.join(base_bath, 'existfile.cfg')

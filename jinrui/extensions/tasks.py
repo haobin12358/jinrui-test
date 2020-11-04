@@ -1,37 +1,37 @@
 # -*- coding: utf-8 -*-
 from flask import current_app
-from sqlalchemy import false
-from datetime import timedelta
+# from sqlalchemy import false
+# from datetime import timedelta
 # from jinrui.config.enums import ActivityStatus, UserActivityStatus, OrderMainStatus, CourseStatus, CouponStatus, \
 #     CouponUserStatus, ProductType, ProductStatus
-from jinrui.extensions.register_ext import celery, db, conn
+from jinrui.extensions.register_ext import celery, db
 
 
-def add_async_task(func, start_time, func_args, conn_id=None, queue='high_priority'):
-    """
-    添加异步任务
-    func: 任务方法名 function
-    start_time: 任务执行时间 datetime
-    func_args: 函数所需参数 tuple
-    conn_id: 要存入redis的key
-    """
-    task_id = func.apply_async(args=func_args, eta=start_time - timedelta(hours=8), queue=queue)
-    connid = conn_id if conn_id else str(func_args[0])
-    current_app.logger.info(f'add async task: func_args:{func_args} | connid: {conn_id}, task_id: {task_id}')
-    conn.set(connid, str(task_id))
-
-
-def cancel_async_task(conn_id):
-    """
-    取消已存在的异步任务
-    conn_id: 存在于redis的key
-    """
-    exist_task_id = conn.get(conn_id)
-    if exist_task_id:
-        exist_task_id = str(exist_task_id, encoding='utf-8')
-        celery.AsyncResult(exist_task_id).revoke()
-        conn.delete(conn_id)
-        current_app.logger.info(f'取消任务成功 task_id:{exist_task_id}')
+# def add_async_task(func, start_time, func_args, conn_id=None, queue='high_priority'):
+#     """
+#     添加异步任务
+#     func: 任务方法名 function
+#     start_time: 任务执行时间 datetime
+#     func_args: 函数所需参数 tuple
+#     conn_id: 要存入redis的key
+#     """
+#     task_id = func.apply_async(args=func_args, eta=start_time - timedelta(hours=8), queue=queue)
+#     connid = conn_id if conn_id else str(func_args[0])
+#     current_app.logger.info(f'add async task: func_args:{func_args} | connid: {conn_id}, task_id: {task_id}')
+#     conn.set(connid, str(task_id))
+#
+#
+# def cancel_async_task(conn_id):
+#     """
+#     取消已存在的异步任务
+#     conn_id: 存在于redis的key
+#     """
+#     exist_task_id = conn.get(conn_id)
+#     if exist_task_id:
+#         exist_task_id = str(exist_task_id, encoding='utf-8')
+#         celery.AsyncResult(exist_task_id).revoke()
+#         conn.delete(conn_id)
+#         current_app.logger.info(f'取消任务成功 task_id:{exist_task_id}')
 
 @celery.task(name='ocr_fix')
 def ocr_fix():
@@ -85,16 +85,24 @@ def auto_setpic():
             for jp in jplist:
                 paper_dict = {}
                 answer_dict = {}
+                encode_tag = '1'
                 if jp.doc_url:
                     current_app.logger.info('jp doc {}'.format(jp.doc_url))
-                    doc_path = _get_fetch(jp.doc_url)
-                    paper_dict = cp.transfordoc(doc_path)
+
+                    try:
+                        doc_path = _get_fetch(jp.doc_url)
+                        paper_dict = cp.transfordoc(doc_path)
+                    except Exception as e:
+                        current_app.logger.error('解析 doc 失败 pageid = {} {}'.format(jp.id, e))
+                        encode_tag = '2'
                     current_app.logger.info('jp doc over')
                 if jp.answer_doc_url:
-                    current_app.logger.info('jp answer {}'.format(jp.answer_doc_url))
-                    answer_path = _get_fetch(jp.answer_doc_url)
-                    answer_dict = cp.transfordoc(answer_path)
-                    current_app.logger.info('jp answer over')
+                    try:
+                        answer_path = _get_fetch(jp.answer_doc_url)
+                        answer_dict = cp.transfordoc(answer_path)
+                    except Exception as e:
+                        current_app.logger.error('解析answer 失败 pageid = {} {}'.format(jp.id, e))
+                        encode_tag = '3'
                 for paper_num in paper_dict:
                     question = j_question.query.filter(
                         j_question.paper_id == jp.id, j_question.question_number == paper_num).first()
@@ -102,11 +110,22 @@ def auto_setpic():
                         continue
                     question.update({'content': paper_dict.get(paper_num), 'answer': answer_dict.get(paper_num)})
                     update_list.append(question)
-                jp.encode_tag = '1'
+                jp.encode_tag = encode_tag
                 update_list.append(jp)
-            db.session.add_all(update_list)
+            try:
+                db.session.add_all(update_list)
+            except Exception as e:
+                current_app.logger.error('数据更新失败 {}'.format(e))
+                raise e
     except Exception as e:
         current_app.logger.info('解析试卷失败 {}'.format(e))
+
+
+@celery.task(name='test_print')
+def test_print():
+    from datetime import datetime
+
+    current_app.logger.info('TEST PRINT: {}'.format(datetime.now()))
 
 
 if __name__ == '__main__':
@@ -114,4 +133,5 @@ if __name__ == '__main__':
 
     app = create_app()
     with app.app_context():
-        auto_setpic()
+        # auto_setpic()
+        test_print()
