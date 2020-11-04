@@ -431,12 +431,16 @@ class COcr():
                                         if fill_dict_ocr.get("png_result"):
                                             png_score = int(fill_dict_ocr.get("png_result"))
                                         else:
-                                            png_score = 0
+                                            png_score = None
                                         if fill_dict_ocr.get("png_status") == "303":
                                             png_status = "303"
                                             png_score = None
                                         else:
                                             png_status = "304"
+                                        if png_score > question.score:
+                                            png_score = None
+                                            png_status = "303"
+
                                         score_dict = {
                                             "id": score_id,
                                             "student_id": student_id,
@@ -508,7 +512,9 @@ class COcr():
                                     else:
                                         png_status = "304"
                                     if pdf.pdf_use == "300201":
-
+                                        if png_score > question.score:
+                                            png_score = None
+                                            png_status = "303"
                                         score_dict = {
                                             "id": score_id,
                                             "student_id": student_id,
