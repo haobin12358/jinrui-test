@@ -460,7 +460,7 @@ class COcr():
                                             "png_url": fill_dict_ocr.get("png_url"),
                                             "pdf_id": pdf.pdf_id,
                                             "png_result": fill_dict_ocr.get("png_result"),
-                                            "png_status": fill_dict_ocr.get("png_status"),
+                                            "png_status": png_status,
                                             "png_type": fill_dict_ocr.get("png_type"),
                                             "booklet_id": booklet_id,
                                             "page_url": jpg_oss_list[sheet["page"] - 1],
@@ -534,7 +534,7 @@ class COcr():
                                             "png_url": answer_dict_ocr.get("png_url"),
                                             "pdf_id": pdf.pdf_id,
                                             "png_result": answer_dict_ocr.get("png_result"),
-                                            "png_status": answer_dict_ocr.get("png_status"),
+                                            "png_status": png_status,
                                             "png_type": answer_dict_ocr.get("png_type"),
                                             "booklet_id": booklet_id,
                                             "page_url": jpg_oss_list[sheet["page"] - 1],
@@ -568,7 +568,7 @@ class COcr():
 
                             with db.auto_commit():
                                 if pdf.pdf_use == "300201":
-                                    answer_png_with_status = j_answer_png.query.filter(j_answer_png.booklet_id == booklet_id, j_answer_png.png_status == "303").all()
+                                    answer_png_with_status = j_score.query.filter(j_score.booklet_id == booklet_id, j_score.status == "303").all()
                                     if answer_png_with_status:
                                         booklet_dict["status"] = "3"
                                     else:

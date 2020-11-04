@@ -223,13 +223,14 @@ class CAnswer():
 
             db.session.add(score_instance)
 
+        with db.auto_commit():
             booklet_id = score.booklet_id
             scores_error = j_score.query.filter(j_score.booklet_id == booklet_id, j_score.status.in_(["303", "302"])).all()
             if not scores_error:
                 scores = j_score.query.filter(j_score.booklet_id == booklet_id).all()
                 score_end = 0
                 for score in scores:
-                    score_end = score_end + int(score)
+                    score_end = score_end + int(score.score)
                 booklet_dict = j_answer_booklet.query.filter(j_answer_booklet.id == booklet_id).first()
                 booklet_instance = booklet_dict.update({
                     "status": "4",
