@@ -9,7 +9,7 @@ from jinrui.extensions.register_ext import db, ali_oss
 from ..extensions.params_validates import parameter_required
 from jinrui.extensions.error_response import ErrorFileType, ErrorAnswerType, ParamsError
 from jinrui.models.jinrui import j_manager, j_answer_zip, j_answer_pdf, j_paper, j_answer_sheet, j_answer_png, \
-    j_role, j_organization, j_school_network, j_answer_upload, j_score
+    j_role, j_organization, j_school_network, j_answer_upload, j_score, j_answer_booklet
 from flask import current_app, request
 from sqlalchemy import false
 
@@ -222,6 +222,23 @@ class CAnswer():
             }, null="not")
 
             db.session.add(score_instance)
+
+            booklet_id = score.booklet_id
+            scores_error = j_score.query.filter(j_score.booklet_id == booklet_id, j_score.status.in_(["303", "302"])).all()
+            if not scores_error:
+                scores = j_score.query.filter(j_score.booklet_id == booklet_id).all()
+                score_end = 0
+                for score in scores:
+                    score_end = score_end + int(score)
+                booklet_dict = j_answer_booklet.query.filter(j_answer_booklet.id == booklet_id).first()
+                booklet_instance = booklet_dict.update({
+                    "status": "4",
+                    "score": score_end,
+                    "grade_time": datetime.now().date()
+                }, null="not")
+                db.session.add(booklet_instance)
+
+
 
         return {
             "code": 200,

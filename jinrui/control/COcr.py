@@ -566,7 +566,13 @@ class COcr():
                                     if answer_png_with_status:
                                         booklet_dict["status"] = "3"
                                     else:
+                                        scores = j_score.query.filter(j_score.booklet_id == booklet_id).all()
+                                        score_end = 0
+                                        for score in scores:
+                                            score_end = score_end + int(score.score)
                                         booklet_dict["status"] = "4"
+                                        booklet_dict["score"] = score_end
+                                        booklet_dict["grade_time"] = datetime.now().date()
                                 booklet_instance = j_answer_booklet.create(booklet_dict)
                                 db.session.add(booklet_instance)
                                 pdf_instance = pdf.update({
@@ -575,11 +581,17 @@ class COcr():
                                 db.session.add(pdf_instance)
                                 pdf_error_status = j_answer_pdf.query.filter(j_answer_pdf.upload_id == upload_id, j_answer_pdf.pdf_status.in_(["300301", "300303", "300304"])).all()
                                 if not pdf_error_status:
-                                    upload = j_answer_upload.query.filter(j_answer_upload.id == upload_id).first()
-                                    upload_instance = upload.update({
-                                        "status": "1"
-                                    })
-                                    db.session.add(upload_instance)
+                                    if pdf.pdf_use == "300201":
+                                        upload_status = "无需分配"
+                                    else:
+                                        upload_status = "1"
+                                else:
+                                    upload_status = "解析失败"
+                                upload = j_answer_upload.query.filter(j_answer_upload.id == upload_id).first()
+                                upload_instance = upload.update({
+                                    "status": upload_status
+                                })
+                                db.session.add(upload_instance)
                         jpg_index = jpg_index + 4
 
                 shutil.rmtree(pdf_path)
