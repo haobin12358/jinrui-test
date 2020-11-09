@@ -11,7 +11,8 @@ class AOcr(Resource):
             'mock_question': self.cocr.mock_question,
             'mock_answer': self.cocr.mock_answer,
             "mock_ocr_response": self.cocr.mock_ocr_response,
-            "deal_pdf": self.cocr.deal_pdf
+            "deal_pdf": self.cocr.deal_pdf,
+            "get_pdf": self.cocr.get_pdf
         }
 
         return apis

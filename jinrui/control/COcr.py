@@ -1099,3 +1099,288 @@ class COcr():
                 }, null="not")
                 db.session.add(question_instance)
         return Success()
+
+    def get_pdf(self):
+        pdf = j_answer_pdf.query.filter(j_answer_pdf.isdelete == 0, j_answer_pdf.pdf_status == "300305") \
+            .order_by(j_answer_pdf.createtime.desc()).first()
+        if pdf and pdf.pdf_ip:
+            """
+            school_network = j_school_network.query.filter(j_school_network.net_ip == pdf.pdf_ip).first()
+            if school_network:
+                school_name = school_network.school_name
+            else:
+                school_name = pdf.pdf_school
+            print(">>>>>>>>>>>>>>>>>>school_name:" + str(school_name))
+            organization = j_organization.query.filter(j_organization.name == school_name,
+                                                       j_organization.role_type == "SCHOOL").first()
+            org_id = organization.id
+            # 组织list，用于判断学生的组织id是否在其中，从而判断学生对应信息
+            children_id_list = _get_all_org_behind_id(org_id)
+            print(">>>>>>>>>>>>>>>>>children_id:" + str(children_id_list))
+
+            upload_id = pdf.upload_id
+            """
+
+            pdf_url = pdf.pdf_url
+            pdf_uuid = str(uuid.uuid1())
+            # 创建pdf存储路径
+            if platform.system() == "Windows":
+                pdf_path = "D:\\jinrui_pdf\\" + pdf_uuid + "\\"
+            else:
+                pdf_path = "/tmp/jinrui_pdf/" + pdf_uuid + "/"
+            if not os.path.exists(pdf_path):
+                os.makedirs(pdf_path)
+
+            auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
+            bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
+
+            pdf_name = pdf_url.split("/")
+            pdf_save_path = pdf_path + pdf_name[-1]
+            # 存储pdf到本地
+            result = bucket.get_object_to_file(pdf_name[-1], pdf_save_path)
+
+            if result.status != 200:
+                with db.auto_commit():
+                    pdf_use = j_answer_pdf.query.filter(j_answer_pdf.pdf_id == pdf.pdf_id).first()
+                    pdf_instance = pdf_use.update({
+                        "pdf_status": "300303"
+                    })
+                    db.session.add(pdf_instance)
+                return {
+                    "status": 405,
+                    "message": "未找到可用pdf"
+                }
+            else:
+                with db.auto_commit():
+                    pdf_use = j_answer_pdf.query.filter(j_answer_pdf.pdf_id == pdf.pdf_id).first()
+                    pdf_instance = pdf_use.update({
+                        "pdf_status": "300305"
+                    })
+                    db.session.add(pdf_instance)
+
+                jpg_dir = self._conver_img(pdf_path, pdf_save_path, pdf_name[-1])
+
+                current_app.logger.info(jpg_dir)
+                current_app.logger.info(pdf.sheet_dict)
+
+                page_ond_dict = {}
+                page_two_dict = {}
+                page_three_dict = {}
+                page_four_dict = {}
+                for page_dict in json.loads(pdf.sheet_dict):
+                    current_app.logger.info(page_dict)
+                    if page_dict["page"] == 1:
+                        page_ond_dict = self._make_dict(page_dict, pdf)
+                    elif page_dict["page"] == 2:
+                        page_two_dict = self._make_dict(page_dict, pdf)
+                    elif page_dict["page"] == 3:
+                        page_three_dict = self._make_dict(page_dict, pdf)
+                    elif page_dict["page"] == 4:
+                        page_four_dict = self._make_dict(page_dict, pdf)
+
+                jpg_index = 0
+                page_list = []
+                while jpg_index < len(jpg_dir):
+                    jpg_dict = jpg_dir[jpg_index: jpg_index + 4]
+                    page_one = {
+                        "jpg_path": pdf_path + jpg_dict[0],
+                        "json_dict": page_ond_dict
+                    }
+                    page_list.append(page_one)
+                    page_two = {
+                        "jpg_path": pdf_path + jpg_dict[1],
+                        "json_dict": page_two_dict
+                    }
+                    page_list.append(page_two)
+                    page_three = {
+                        "jpg_path": pdf_path + jpg_dict[2],
+                        "json_dict": page_three_dict
+                    }
+                    page_list.append(page_three)
+                    page_four = {
+                        "jpg_path": pdf_path + jpg_dict[3],
+                        "json_dict": page_four_dict
+                    }
+                    page_list.append(page_four)
+
+                    jpg_index += 4
+                current_app.logger.info(json.dumps(page_list))
+                return page_list
+
+
+    def _make_dict(self, page_dict, pdf):
+        page_ocr_dict = {}
+        page_ocr_dict["width"] = page_dict["width"]
+        page_ocr_dict["height"] = page_dict["height"]
+        page_ocr_dict["uuid"] = str(uuid.uuid1())
+        page_ocr_dict["ocr_dict"] = []
+        for dot in page_dict["data"]:
+            if dot["type"] == "sn":
+                dot_dict = {}
+                dot_dict["ocr_dot"] = dot["dot"]
+                dot_dict["cut_dot"] = dot["dot"]
+                dot_dict["ocr_height"] = dot["height"]
+                dot_dict["index"] = None
+                dot_dict["ocr_width"] = dot["width"]
+                dot_dict["cut_height"] = dot["height"]
+                dot_dict["cut_width"] = dot["width"]
+                dot_dict["type"] = "28"
+                dot_dict["img_use"] = "300203"
+                dot_dict["result"] = None
+                dot_dict["result_status"] = None
+                dot_dict["img_path"] = None
+                page_ocr_dict["ocr_dict"].append(dot_dict)
+            elif dot["type"] == "no":
+                dot_dict = {}
+                dot_dict["ocr_dot"] = dot["dot"]
+                dot_dict["cut_dot"] = dot["dot"]
+                dot_dict["ocr_height"] = dot["height"]
+                dot_dict["index"] = None
+                dot_dict["ocr_width"] = dot["width"]
+                dot_dict["cut_height"] = dot["height"]
+                dot_dict["cut_width"] = dot["width"]
+                dot_dict["type"] = "29"
+                dot_dict["img_use"] = "300203"
+                dot_dict["result"] = None
+                dot_dict["result_status"] = None
+                dot_dict["img_path"] = None
+                page_ocr_dict["ocr_dict"].append(dot_dict)
+            elif dot["type"] == "miss":
+                dot_dict = {}
+                dot_dict["ocr_dot"] = dot["dot"]
+                dot_dict["cut_dot"] = dot["dot"]
+                dot_dict["ocr_height"] = dot["height"]
+                dot_dict["index"] = None
+                dot_dict["ocr_width"] = dot["width"]
+                dot_dict["cut_height"] = dot["height"]
+                dot_dict["cut_width"] = dot["width"]
+                dot_dict["type"] = "20"
+                dot_dict["img_use"] = "300203"
+                dot_dict["result"] = None
+                dot_dict["result_status"] = None
+                dot_dict["img_path"] = None
+                page_ocr_dict["ocr_dict"].append(dot_dict)
+            elif dot["type"] == "select":
+                j = 0
+                while j < dot["num"]:
+                    dot_dict = {}
+                    up = 26.37 + (j % 5) * dot["every_height"] + dot["dot"][1]
+                    left = (int(j / 5)) * dot["every_width"] + dot["dot"][0]
+                    dot_dict["ocr_dot"] = [left, up]
+                    dot_dict["cut_dot"] = [left, up]
+                    dot_dict["ocr_height"] = dot["score_height"]
+                    dot_dict["cut_height"] = dot["score_height"]
+                    dot_dict["index"] = "{0}".format(str(dot["start"] + j))
+                    dot_dict["ocr_width"] = dot["score_width"]
+                    dot_dict["cut_width"] = dot["score_width"]
+                    dot_dict["type"] = "21"
+                    dot_dict["img_use"] = "300201"
+                    dot_dict["result"] = None
+                    dot_dict["result_status"] = None
+                    dot_dict["img_path"] = None
+                    page_ocr_dict["ocr_dict"].append(dot_dict)
+                    j += 1
+            elif dot["type"] == "multi":
+                j = 0
+                while j < dot["num"]:
+                    dot_dict = {}
+                    up = 26.37 + (j % 5) * dot["every_height"] + dot["dot"][1]
+                    left = (int(j / 5)) * dot["every_width"] + dot["dot"][0]
+                    dot_dict["ocr_dot"] = [left, up]
+                    dot_dict["cut_dot"] = [left, up]
+                    dot_dict["ocr_height"] = dot["score_height"]
+                    dot_dict["cut_height"] = dot["score_height"]
+                    dot_dict["index"] = "{0}".format(str(dot["start"] + j))
+                    dot_dict["ocr_width"] = dot["score_width"]
+                    dot_dict["cut_width"] = dot["score_width"]
+                    dot_dict["type"] = "22"
+                    dot_dict["img_use"] = "300201"
+                    dot_dict["result"] = None
+                    dot_dict["result_status"] = None
+                    dot_dict["img_path"] = None
+                    page_ocr_dict["ocr_dict"].append(dot_dict)
+                    j += 1
+            elif dot["type"] == "judge":
+                j = 0
+                while j < dot["num"]:
+                    dot_dict = {}
+                    up = 26.37 + (j % 5) * dot["every_height"] + dot["dot"][1]
+                    left = (int(j / 5)) * dot["every_width"] + dot["dot"][0]
+                    dot_dict["ocr_dot"] = [left, up]
+                    dot_dict["cut_dot"] = [left, up]
+                    dot_dict["ocr_height"] = dot["score_height"]
+                    dot_dict["cut_height"] = dot["score_height"]
+                    dot_dict["index"] = "{0}".format(str(dot["start"] + j))
+                    dot_dict["ocr_width"] = dot["score_width"]
+                    dot_dict["cut_width"] = dot["score_width"]
+                    dot_dict["type"] = "23"
+                    dot_dict["img_use"] = "300201"
+                    dot_dict["result"] = None
+                    dot_dict["result_status"] = None
+                    dot_dict["img_path"] = None
+                    page_ocr_dict["ocr_dict"].append(dot_dict)
+                    j += 1
+            elif dot["type"] == "fill":
+                if pdf.pdf_use == "300201":
+                    dot_dict = {}
+                    dot_dict["ocr_dot"] = dot["score_dot"]
+                    dot_dict["cut_dot"] = dot["dot"]
+                    dot_dict["ocr_height"] = dot["score_height"]
+                    dot_dict["cut_height"] = dot["every_height"]
+                    dot_dict["index"] = "{0}".format(str(dot["start"]))
+                    dot_dict["ocr_width"] = dot["score_width"]
+                    dot_dict["cut_width"] = dot["every_width"]
+                    dot_dict["type"] = "25"
+                    dot_dict["img_use"] = "300201"
+                    dot_dict["result"] = None
+                    dot_dict["result_status"] = None
+                    dot_dict["img_path"] = None
+                    page_ocr_dict["ocr_dict"].append(dot_dict)
+                elif pdf.pdf_use == "300202":
+                    dot_dict = {}
+                    dot_dict["ocr_dot"] = None
+                    dot_dict["cut_dot"] = dot["dot"]
+                    dot_dict["ocr_height"] = None
+                    dot_dict["cut_height"] = dot["every_height"]
+                    dot_dict["index"] = "{0}".format(str(dot["start"]))
+                    dot_dict["ocr_width"] = None
+                    dot_dict["cut_width"] = dot["every_width"]
+                    dot_dict["type"] = "25"
+                    dot_dict["img_use"] = "300202"
+                    dot_dict["result"] = None
+                    dot_dict["result_status"] = None
+                    dot_dict["img_path"] = None
+                    page_ocr_dict["ocr_dict"].append(dot_dict)
+            elif dot["type"] == "answer":
+                if pdf.pdf_use == "300201":
+                    dot_dict = {}
+                    dot_dict["ocr_dot"] = dot["score_dot"]
+                    dot_dict["cut_dot"] = dot["dot"]
+                    dot_dict["ocr_height"] = dot["score_height"]
+                    dot_dict["cut_height"] = dot["every_height"]
+                    dot_dict["index"] = "{0}".format(str(dot["start"]))
+                    dot_dict["ocr_width"] = dot["score_width"]
+                    dot_dict["cut_width"] = dot["every_width"]
+                    dot_dict["type"] = "27"
+                    dot_dict["img_use"] = "300201"
+                    dot_dict["result"] = None
+                    dot_dict["result_status"] = None
+                    dot_dict["img_path"] = None
+                    page_ocr_dict["ocr_dict"].append(dot_dict)
+                elif pdf.pdf_use == "300202":
+                    dot_dict = {}
+                    dot_dict["ocr_dot"] = None
+                    dot_dict["cut_dot"] = dot["dot"]
+                    dot_dict["ocr_height"] = None
+                    dot_dict["cut_height"] = dot["every_height"]
+                    dot_dict["index"] = "{0}".format(str(dot["start"]))
+                    dot_dict["ocr_width"] = None
+                    dot_dict["cut_width"] = dot["every_width"]
+                    dot_dict["type"] = "27"
+                    dot_dict["img_use"] = "300202"
+                    dot_dict["result"] = None
+                    dot_dict["result_status"] = None
+                    dot_dict["img_path"] = None
+                    page_ocr_dict["ocr_dict"].append(dot_dict)
+
+        return page_ocr_dict
