@@ -81,9 +81,10 @@ class COcr():
             bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
 
             pdf_name = pdf_url.split("/")
+            pdf_oss_name = pdf_url.replace("https://{0}.{1}/".format(ALIOSS_BUCKET_NAME, ALIOSS_ENDPOINT), "")
             pdf_save_path = pdf_path + pdf_name[-1]
             # 存储pdf到本地
-            result = bucket.get_object_to_file(pdf_name[-1], pdf_save_path)
+            result = bucket.get_object_to_file(pdf_oss_name, pdf_save_path)
 
             if result.status != 200:
                 with db.auto_commit():
