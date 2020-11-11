@@ -608,7 +608,7 @@ class COcr():
 
     def _conver_img(self, pdf_path, pdf_save_path, pdf_name):
         """
-        将pdf转化为jpg
+        将pdf转化为png
         """
         doc = fitz.Document(pdf_save_path)
         pdf_name_without_ext = pdf_name.split(".")[0]
@@ -623,11 +623,11 @@ class COcr():
             trans = fitz.Matrix(zoom_x, zoom_y).preRotate(rotate)
             pm = page.getPixmap(matrix=trans, alpha=False)
             if platform.system() == "Windows":
-                pm.writePNG(pdf_path + '{0}-{1}.jpg'.format(pdf_name_without_ext, "%04d" % i))
-                jpg_dir.append('{0}-{1}.jpg'.format(pdf_name_without_ext, "%04d" % i))
+                pm.writePNG(pdf_path + '{0}-{1}.png'.format(pdf_name_without_ext, "%04d" % i))
+                jpg_dir.append('{0}-{1}.png'.format(pdf_name_without_ext, "%04d" % i))
             else:
-                pm.writePNG(pdf_path + '{0}-{1}.jpg'.format(pdf_name_without_ext, "%04d" % i))
-                jpg_dir.append('{0}-{1}.jpg'.format(pdf_name_without_ext, "%04d" % i))
+                pm.writePNG(pdf_path + '{0}-{1}.png'.format(pdf_name_without_ext, "%04d" % i))
+                jpg_dir.append('{0}-{1}.png'.format(pdf_name_without_ext, "%04d" % i))
             i = i + 1
 
         return jpg_dir
