@@ -621,13 +621,14 @@ class COcr():
             zoom_x = 2.0
             zoom_y = 2.0
             trans = fitz.Matrix(zoom_x, zoom_y).preRotate(rotate)
+            png_uuid = "png" + str(uuid.uuid1())
             pm = page.getPixmap(matrix=trans, alpha=False)
             if platform.system() == "Windows":
-                pm.writePNG(pdf_path + '{0}-{1}.png'.format(pdf_name_without_ext, "%04d" % i))
-                jpg_dir.append('{0}-{1}.png'.format(pdf_name_without_ext, "%04d" % i))
+                pm.writePNG(pdf_path + '{0}-{1}.png'.format(png_uuid, "%04d" % i))
+                jpg_dir.append('{0}-{1}.png'.format(png_uuid, "%04d" % i))
             else:
-                pm.writePNG(pdf_path + '{0}-{1}.png'.format(pdf_name_without_ext, "%04d" % i))
-                jpg_dir.append('{0}-{1}.png'.format(pdf_name_without_ext, "%04d" % i))
+                pm.writePNG(pdf_path + '{0}-{1}.png'.format(png_uuid, "%04d" % i))
+                jpg_dir.append('{0}-{1}.png'.format(png_uuid, "%04d" % i))
             i = i + 1
 
         return jpg_dir
