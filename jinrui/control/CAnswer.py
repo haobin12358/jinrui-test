@@ -108,7 +108,7 @@ class CAnswer():
                         "pdf_use": pdf_use,
                         "paper_name": data.get("paperId"),
                         "sheet_dict": sheet.json,
-                        "pdf_status": "300301",
+                        "pdf_status": "300305",
                         "pdf_url": pdf_url,
                         "pdf_address": "zip",
                         "pdf_school": school_name,

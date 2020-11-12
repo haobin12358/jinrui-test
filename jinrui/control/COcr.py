@@ -1269,11 +1269,11 @@ class COcr():
                     left = (int(j / 5)) * dot["every_width"] + dot["dot"][0]
                     dot_dict["ocr_dot"] = [left, up]
                     dot_dict["cut_dot"] = [left, up]
-                    dot_dict["ocr_height"] = dot["score_height"]
-                    dot_dict["cut_height"] = dot["score_height"]
+                    dot_dict["ocr_height"] = dot["every_height"]
+                    dot_dict["cut_height"] = dot["every_height"]
                     dot_dict["index"] = "{0}".format(str(dot["start"] + j))
-                    dot_dict["ocr_width"] = dot["score_width"]
-                    dot_dict["cut_width"] = dot["score_width"]
+                    dot_dict["ocr_width"] = dot["every_width"]
+                    dot_dict["cut_width"] = dot["every_width"]
                     dot_dict["type"] = "21"
                     dot_dict["img_use"] = "300201"
                     dot_dict["result"] = None
@@ -1289,11 +1289,11 @@ class COcr():
                     left = (int(j / 5)) * dot["every_width"] + dot["dot"][0]
                     dot_dict["ocr_dot"] = [left, up]
                     dot_dict["cut_dot"] = [left, up]
-                    dot_dict["ocr_height"] = dot["score_height"]
-                    dot_dict["cut_height"] = dot["score_height"]
+                    dot_dict["ocr_height"] = dot["every_height"]
+                    dot_dict["cut_height"] = dot["every_height"]
                     dot_dict["index"] = "{0}".format(str(dot["start"] + j))
-                    dot_dict["ocr_width"] = dot["score_width"]
-                    dot_dict["cut_width"] = dot["score_width"]
+                    dot_dict["ocr_width"] = dot["every_width"]
+                    dot_dict["cut_width"] = dot["every_width"]
                     dot_dict["type"] = "22"
                     dot_dict["img_use"] = "300201"
                     dot_dict["result"] = None
@@ -1309,11 +1309,11 @@ class COcr():
                     left = (int(j / 5)) * dot["every_width"] + dot["dot"][0]
                     dot_dict["ocr_dot"] = [left, up]
                     dot_dict["cut_dot"] = [left, up]
-                    dot_dict["ocr_height"] = dot["score_height"]
-                    dot_dict["cut_height"] = dot["score_height"]
+                    dot_dict["ocr_height"] = dot["every_height"]
+                    dot_dict["cut_height"] = dot["every_height"]
                     dot_dict["index"] = "{0}".format(str(dot["start"] + j))
-                    dot_dict["ocr_width"] = dot["score_width"]
-                    dot_dict["cut_width"] = dot["score_width"]
+                    dot_dict["ocr_width"] = dot["every_width"]
+                    dot_dict["cut_width"] = dot["every_width"]
                     dot_dict["type"] = "23"
                     dot_dict["img_use"] = "300201"
                     dot_dict["result"] = None
@@ -1322,6 +1322,9 @@ class COcr():
                     page_ocr_dict["ocr_dict"].append(dot_dict)
                     j += 1
             elif dot["type"] == "fill":
+                if dot["show_title"] == 1:
+                    # dot["every_height"] += dot["title_height"]
+                    dot["dot"][1] += dot["title_height"]
                 if pdf.pdf_use == "300201":
                     dot_dict = {}
                     dot_dict["ocr_dot"] = dot["score_dot"]
@@ -1358,10 +1361,10 @@ class COcr():
                     dot_dict["ocr_dot"] = dot["score_dot"]
                     dot_dict["cut_dot"] = dot["dot"]
                     dot_dict["ocr_height"] = dot["score_height"]
-                    dot_dict["cut_height"] = dot["every_height"]
+                    dot_dict["cut_height"] = dot["height"]
                     dot_dict["index"] = "{0}".format(str(dot["start"]))
                     dot_dict["ocr_width"] = dot["score_width"]
-                    dot_dict["cut_width"] = dot["every_width"]
+                    dot_dict["cut_width"] = dot["width"]
                     dot_dict["type"] = "27"
                     dot_dict["img_use"] = "300201"
                     dot_dict["result"] = None
@@ -1373,10 +1376,10 @@ class COcr():
                     dot_dict["ocr_dot"] = None
                     dot_dict["cut_dot"] = dot["dot"]
                     dot_dict["ocr_height"] = None
-                    dot_dict["cut_height"] = dot["every_height"]
+                    dot_dict["cut_height"] = dot["height"]
                     dot_dict["index"] = "{0}".format(str(dot["start"]))
                     dot_dict["ocr_width"] = None
-                    dot_dict["cut_width"] = dot["every_width"]
+                    dot_dict["cut_width"] = dot["width"]
                     dot_dict["type"] = "27"
                     dot_dict["img_use"] = "300202"
                     dot_dict["result"] = None
