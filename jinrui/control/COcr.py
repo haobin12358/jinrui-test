@@ -1156,6 +1156,7 @@ class COcr():
             else:
                 with db.auto_commit():
                     pdf_use = j_answer_pdf.query.filter(j_answer_pdf.pdf_id == pdf.pdf_id).first()
+                    print(pdf_use.createtime)
                     pdf_instance = pdf_use.update({
                         "pdf_status": "300305"
                     })
@@ -1265,9 +1266,25 @@ class COcr():
                 page_ocr_dict["ocr_dict"].append(dot_dict)
             elif dot["type"] == "select":
                 j = 0
+                """
+                dot_dict = {}
+                dot_dict["ocr_dot"] = dot["dot"]
+                dot_dict["cut_dot"] = dot["dot"]
+                dot_dict["ocr_height"] = dot["height"]
+                dot_dict["cut_height"] = dot["height"]
+                dot_dict["index"] = "{0}".format(str(dot["start"] + j))
+                dot_dict["ocr_width"] = dot["width"]
+                dot_dict["cut_width"] = dot["width"]
+                dot_dict["type"] = "21"
+                dot_dict["img_use"] = "300201"
+                dot_dict["result"] = None
+                dot_dict["result_status"] = None
+                dot_dict["img_path"] = None
+                page_ocr_dict["ocr_dict"].append(dot_dict)
+                """
                 while j < dot["num"]:
                     dot_dict = {}
-                    up = 25 + (j % 5) * dot["every_height"] + dot["dot"][1]
+                    up = 28.339 + (j % 5) * dot["every_height"] + dot["dot"][1]
                     left = (int(j / 5)) * dot["every_width"] + dot["dot"][0]
                     dot_dict["ocr_dot"] = [left, up]
                     dot_dict["cut_dot"] = [left, up]
@@ -1287,7 +1304,7 @@ class COcr():
                 j = 0
                 while j < dot["num"]:
                     dot_dict = {}
-                    up = 25 + (j % 5) * dot["every_height"] + dot["dot"][1]
+                    up = 28.339 + (j % 5) * dot["every_height"] + dot["dot"][1]
                     left = (int(j / 5)) * dot["every_width"] + dot["dot"][0]
                     dot_dict["ocr_dot"] = [left, up]
                     dot_dict["cut_dot"] = [left, up]
@@ -1307,7 +1324,7 @@ class COcr():
                 j = 0
                 while j < dot["num"]:
                     dot_dict = {}
-                    up = 25 + (j % 5) * dot["every_height"] + dot["dot"][1]
+                    up = 28.339 + (j % 5) * dot["every_height"] + dot["dot"][1]
                     left = (int(j / 5)) * dot["every_width"] + dot["dot"][0]
                     dot_dict["ocr_dot"] = [left, up]
                     dot_dict["cut_dot"] = [left, up]
