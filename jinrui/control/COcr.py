@@ -623,6 +623,8 @@ class COcr():
             trans = fitz.Matrix(zoom_x, zoom_y).preRotate(rotate)
             png_uuid = "png" + str(uuid.uuid1())
             pm = page.getPixmap(matrix=trans, alpha=False)
+            print(pm.height)
+            print(pm.width)
             if platform.system() == "Windows":
                 pm.writePNG(pdf_path + '{0}-{1}.png'.format(png_uuid, "%04d" % i))
                 jpg_dir.append('{0}-{1}.png'.format(png_uuid, "%04d" % i))
@@ -1265,7 +1267,7 @@ class COcr():
                 j = 0
                 while j < dot["num"]:
                     dot_dict = {}
-                    up = 26.37 + (j % 5) * dot["every_height"] + dot["dot"][1]
+                    up = 25 + (j % 5) * dot["every_height"] + dot["dot"][1]
                     left = (int(j / 5)) * dot["every_width"] + dot["dot"][0]
                     dot_dict["ocr_dot"] = [left, up]
                     dot_dict["cut_dot"] = [left, up]
@@ -1285,7 +1287,7 @@ class COcr():
                 j = 0
                 while j < dot["num"]:
                     dot_dict = {}
-                    up = 26.37 + (j % 5) * dot["every_height"] + dot["dot"][1]
+                    up = 25 + (j % 5) * dot["every_height"] + dot["dot"][1]
                     left = (int(j / 5)) * dot["every_width"] + dot["dot"][0]
                     dot_dict["ocr_dot"] = [left, up]
                     dot_dict["cut_dot"] = [left, up]
@@ -1305,7 +1307,7 @@ class COcr():
                 j = 0
                 while j < dot["num"]:
                     dot_dict = {}
-                    up = 26.37 + (j % 5) * dot["every_height"] + dot["dot"][1]
+                    up = 25 + (j % 5) * dot["every_height"] + dot["dot"][1]
                     left = (int(j / 5)) * dot["every_width"] + dot["dot"][0]
                     dot_dict["ocr_dot"] = [left, up]
                     dot_dict["cut_dot"] = [left, up]
