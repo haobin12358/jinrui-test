@@ -16,7 +16,7 @@ def path_change_test(origin_path):
     """
     将网络图像路径转化为本地图像路径
     """
-    local_path = os.path.join(os.getcwd(), "origin")
+    local_path = os.path.join(os.getcwd(),"origin")
     local_list = os.listdir(local_path)
 
     ext_name = os.path.basename(origin_path).split("-")[-1]
@@ -177,6 +177,7 @@ def compute_effect_area(img):
     effect_area = [
         left_top_pts[0], left_top_pts[1], effect_area_width, effect_area_height
     ]
+    print(effect_area)
 
     return effect_area
 
@@ -281,7 +282,7 @@ def aligner_cut():
             print("cut failed")
             continue
         save_img(draw_cut, img_path, 1)
-        save_img(draw_cut, img_path, 2)
+        save_img(draw_ocr, img_path, 2)
 
 
 if __name__ == "__main__":
