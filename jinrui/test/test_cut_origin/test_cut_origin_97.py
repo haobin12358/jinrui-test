@@ -9,7 +9,7 @@ import os
 import cv2
 import time
 
-url = "http://localhost:7444/api/ocr/get_pdf"
+url = "https://jinrui.sanbinit.cn/api/ocr/get_pdf"
 
 
 def path_change_test(origin_path):
