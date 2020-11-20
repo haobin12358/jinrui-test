@@ -6,7 +6,7 @@ from jinrui.config.secret import ACCESS_KEY_SECRET, ACCESS_KEY_ID, ALIOSS_ENDPOI
 from jinrui.extensions.register_ext import db
 from ..extensions.params_validates import parameter_required
 from jinrui.models.jinrui import j_question, j_answer_pdf, j_answer_png, j_student, j_organization, j_school_network, \
-    j_answer_zip, j_paper, j_score, j_answer_booklet, j_answer_upload
+    j_answer_zip, j_paper, j_score, j_answer_booklet, j_answer_upload, j_answer_sheet
 from flask import current_app
 
 class COcr():
@@ -19,7 +19,7 @@ class COcr():
         self.jpg_list = []
 
     def mock_ocr_response(self):
-        args = parameter_required(("image_url", "image_type"))
+        data = parameter_required(("image_url", "image_dict"))
         model = "/opt/jinrui/jinrui/jinrui/libsheet/models/"
         import sheet
         d = sheet.Detector(model)
@@ -32,19 +32,23 @@ class COcr():
         # 阿里云oss参数
         auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
         bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
-        row_dict = args.get("image_url").split("/")
+        row_dict = data.get("image_url").split("/")
         pic_save_path = pic_path + row_dict[-1]
         bucket.get_object_to_file(row_dict[-1], pic_save_path)
-        values, err, info = d.detect(pic_save_path, args.get("image_type"))
+        current_app.logger.info(data.get("image_dict"))
+        data = d.detct_sheet(img_path=pic_save_path, json_dict=data.get("image_dict"))
         current_app.logger.info(pic_save_path)
-        data = {
-            "values": values,
-            "err": err,
-            "info": info
-        }
+        current_app.logger.info(data)
 
         shutil.rmtree(pic_path)
         return Success(data=data)
+
+    def _use_ocr(self, image_path, image_dict):
+        model = "/opt/jinrui/jinrui/jinrui/libsheet/models/"
+        import sheet
+        d = sheet.Detector(model)
+        data = d.detct_sheet(img_path=image_path, json_dict=image_dict)
+        return json.loads(data)
 
     def deal_pdf(self):
         # 比对正确答案处理分数
@@ -1103,26 +1107,26 @@ class COcr():
                 db.session.add(question_instance)
         return Success()
 
-    def get_pdf(self):
+    def mock_booklet(self):
         pdf = j_answer_pdf.query.filter(j_answer_pdf.isdelete == 0, j_answer_pdf.pdf_status == "300305") \
             .order_by(j_answer_pdf.createtime.desc()).first()
         if pdf and pdf.pdf_ip:
-            """
+            # 判断pdf可用性，如果pdf可用，继续执行
+            # 获取组织信息
             school_network = j_school_network.query.filter(j_school_network.net_ip == pdf.pdf_ip).first()
             if school_network:
                 school_name = school_network.school_name
             else:
                 school_name = pdf.pdf_school
-            print(">>>>>>>>>>>>>>>>>>school_name:" + str(school_name))
+            current_app.logger.info(">>>>>>>>>>>>>>>>>>school_name:" + str(school_name))
             organization = j_organization.query.filter(j_organization.name == school_name,
                                                        j_organization.role_type == "SCHOOL").first()
             org_id = organization.id
             # 组织list，用于判断学生的组织id是否在其中，从而判断学生对应信息
-            children_id_list = _get_all_org_behind_id(org_id)
-            print(">>>>>>>>>>>>>>>>>children_id:" + str(children_id_list))
+            children_id_list = self._get_all_org_behind_id(org_id)
+            current_app.logger.info(">>>>>>>>>>>>>>>>>children_id:" + str(children_id_list))
 
             upload_id = pdf.upload_id
-            """
 
             pdf_url = pdf.pdf_url
             pdf_uuid = str(uuid.uuid1())
@@ -1142,6 +1146,9 @@ class COcr():
             # 存储pdf到本地
             result = bucket.get_object_to_file(pdf_name[-1], pdf_save_path)
 
+            paper_name = pdf.paper_name
+            paper = j_paper.query.filter(j_paper.paper_name == paper_name).first()
+
             if result.status != 200:
                 with db.auto_commit():
                     pdf_use = j_answer_pdf.query.filter(j_answer_pdf.pdf_id == pdf.pdf_id).first()
@@ -1149,16 +1156,12 @@ class COcr():
                         "pdf_status": "300303"
                     })
                     db.session.add(pdf_instance)
-                return {
-                    "status": 405,
-                    "message": "未找到可用pdf"
-                }
+                raise Exception("下载pdf失败，失败pdf_id:{0}".format(pdf.pdf_id))
             else:
                 with db.auto_commit():
                     pdf_use = j_answer_pdf.query.filter(j_answer_pdf.pdf_id == pdf.pdf_id).first()
-                    print(pdf_use.createtime)
                     pdf_instance = pdf_use.update({
-                        "pdf_status": "300305"
+                        "pdf_status": "300304"
                     })
                     db.session.add(pdf_instance)
 
@@ -1167,14 +1170,14 @@ class COcr():
                 current_app.logger.info(jpg_dir)
                 current_app.logger.info(pdf.sheet_dict)
 
-                page_ond_dict = {}
+                page_one_dict = {}
                 page_two_dict = {}
                 page_three_dict = {}
                 page_four_dict = {}
                 for page_dict in json.loads(pdf.sheet_dict):
                     current_app.logger.info(page_dict)
                     if page_dict["page"] == 1:
-                        page_ond_dict = self._make_dict(page_dict, pdf)
+                        page_one_dict = self._make_dict(page_dict, pdf)
                     elif page_dict["page"] == 2:
                         page_two_dict = self._make_dict(page_dict, pdf)
                     elif page_dict["page"] == 3:
@@ -1183,34 +1186,381 @@ class COcr():
                         page_four_dict = self._make_dict(page_dict, pdf)
 
                 jpg_index = 0
-                page_list = []
                 while jpg_index < len(jpg_dir):
                     jpg_dict = jpg_dir[jpg_index: jpg_index + 4]
-                    page_one = {
-                        "jpg_path": pdf_path + jpg_dict[0],
-                        "json_dict": page_ond_dict
-                    }
-                    page_list.append(page_one)
-                    page_two = {
-                        "jpg_path": pdf_path + jpg_dict[1],
-                        "json_dict": page_two_dict
-                    }
-                    page_list.append(page_two)
-                    page_three = {
-                        "jpg_path": pdf_path + jpg_dict[2],
-                        "json_dict": page_three_dict
-                    }
-                    page_list.append(page_three)
-                    page_four = {
-                        "jpg_path": pdf_path + jpg_dict[3],
-                        "json_dict": page_four_dict
-                    }
-                    page_list.append(page_four)
+                    response_one = self._use_ocr(pdf_path + jpg_dict[0], page_one_dict)
+                    # oss
+                    auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
+                    bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
+                    page_one_file_fullname = (pdf_path + jpg_dict[0]).split(".")[0]
+                    page_one_ext = (pdf_path + jpg_dict[0]).split(".")[1]
+                    jpg_uuid = str(uuid.uuid1())
 
+                    page_one_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + page_one_file_fullname + "-" + jpg_uuid + "." + page_one_ext
+                    result = bucket.put_object_from_file(page_one_file_fullname + "-" + jpg_uuid + "." + page_one_ext,
+                                                         pdf_path + jpg_dict[0])
+                    current_app.logger.info(str(result))
+
+                    page_two_file_fullname = (pdf_path + jpg_dict[0]).split(".")[0]
+                    page_two_ext = (pdf_path + jpg_dict[0]).split(".")[1]
+
+                    page_two_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + page_two_file_fullname + "-" + jpg_uuid + "." + page_two_ext
+                    result = bucket.put_object_from_file(page_two_file_fullname + "-" + jpg_uuid + "." + page_two_ext,
+                                                         pdf_path + jpg_dict[0])
+                    current_app.logger.info(str(result))
+
+                    page_three_file_fullname = (pdf_path + jpg_dict[0]).split(".")[0]
+                    page_three_ext = (pdf_path + jpg_dict[0]).split(".")[1]
+
+                    page_three_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + page_three_file_fullname + "-" + jpg_uuid + "." + page_three_ext
+                    result = bucket.put_object_from_file(page_three_file_fullname + "-" + jpg_uuid + "." + page_three_ext,
+                                                         pdf_path + jpg_dict[0])
+                    current_app.logger.info(str(result))
+
+                    page_four_file_fullname = (pdf_path + jpg_dict[0]).split(".")[0]
+                    page_four_ext = (pdf_path + jpg_dict[0]).split(".")[1]
+
+                    page_four_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + page_four_file_fullname + "-" + jpg_uuid + "." + page_four_ext
+                    result = bucket.put_object_from_file(page_four_file_fullname + "-" + jpg_uuid + "." + page_four_ext,
+                                                         pdf_path + jpg_dict[0])
+                    current_app.logger.info(str(result))
+
+                    sn = None
+                    student_no = None
+                    student_no_id = None
+                    booklet_id = str(uuid.uuid1())
+                    student_name = None
+                    student_id = None
+                    is_miss = "302"
+
+                    if response_one and response_one["status"] == 200:
+                        result = response_one["data"]
+                        result_list = result["dirct"]
+                        for result_dict in result_list:
+                            if result_dict["index"] == "-3":
+                                sn = result_dict["ocr_result"]
+                                paper = j_paper.query.filter(j_paper.id == sn).first()
+                                if paper and paper.paper_name == pdf.paper_name:
+                                    status = "301"
+                                    pic_path = result_dict["cut_image_path"]
+                                    # oss
+                                    auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
+                                    bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
+                                    file_fullname = pic_path.split(".")[0]
+                                    ext = pic_path.split(".")[1]
+                                    jpg_uuid = str(uuid.uuid1())
+
+                                    jpg_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + file_fullname + "-" + jpg_uuid + "." + ext
+                                    result = bucket.put_object_from_file(file_fullname + "-" + jpg_uuid + "." + ext,
+                                                                         pic_path)
+                                    current_app.logger.info(str(result))
+                                    student_no_id = str(uuid.uuid1())
+                                    with db.auto_commit():
+                                        png_instance = j_answer_png.create({
+                                            "isdelete": 0,
+                                            "createtime": datetime.now(),
+                                            "updatetime": datetime.now(),
+                                            "png_id": student_no_id,
+                                            "png_url": jpg_url,
+                                            "pdf_id": pdf.pdf_id,
+                                            "png_result": student_no,
+                                            "png_status": status,
+                                            "png_type": "28",
+                                            "question": None,
+                                            "booklet_id": booklet_id,
+                                            "page_url": page_one_url,
+                                            "student_no": student_no,
+                                            "student_no_id": student_no_id,
+                                            "student_name": student_name,
+                                            "school": school_name,
+                                            "result_score": None,
+                                            "result_update": None,
+                                            "score_id": None
+                                        })
+                                        db.session.add(png_instance)
+                                else:
+                                    current_app.logger.info("该pdf存在异常答卷")
+                                    with db.auto_commit():
+                                        pdf_use = j_answer_pdf.query.filter(j_answer_pdf.pdf_id == pdf.pdf_id).first()
+                                        pdf_instance = pdf_use.update({
+                                            "pdf_status": "300303"
+                                        })
+                                        db.session.add(pdf_instance)
+                                    raise Exception("答卷异常")
+                            if result_dict["index"] == "-2":
+                                # 缺考
+                                if result_dict["ocr_result"] == "1":
+                                    is_miss = "301"
+                            if result_dict["index"] == "-4":
+                                student_no = result_dict["ocr_result"]
+                                student = j_student.query.filter(j_student.student_number == student_no).first()
+                                if student:
+                                    status = 301
+                                    student_name = student.name
+                                    student_id = student.id
+                                else:
+                                    status = 303
+                                    student_name = None
+                                    student_id = None
+                                pic_path = result_dict["cut_image_path"]
+                                # oss
+                                auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
+                                bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
+                                file_fullname = pic_path.split(".")[0]
+                                ext = pic_path.split(".")[1]
+                                jpg_uuid = str(uuid.uuid1())
+
+                                jpg_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + file_fullname + "-" + jpg_uuid + "." + ext
+                                result = bucket.put_object_from_file(file_fullname + "-" + jpg_uuid + "." + ext,
+                                                                     pic_path)
+                                current_app.logger.info(str(result))
+                                student_no_id = str(uuid.uuid1())
+                                with db.auto_commit():
+                                    png_instance = j_answer_png.create({
+                                        "isdelete": 0,
+                                        "createtime": datetime.now(),
+                                        "updatetime": datetime.now(),
+                                        "png_id": student_no_id,
+                                        "png_url": jpg_url,
+                                        "pdf_id": pdf.pdf_id,
+                                        "png_result": student_no,
+                                        "png_status": status,
+                                        "png_type": "29",
+                                        "question": None,
+                                        "booklet_id": booklet_id,
+                                        "page_url": page_one_url,
+                                        "student_no": student_no,
+                                        "student_no_id": student_no_id,
+                                        "student_name": student_name,
+                                        "school": school_name,
+                                        "result_score": None,
+                                        "result_update": None,
+                                        "score_id": None
+                                    })
+                                    db.session.add(png_instance)
+
+                    else:
+                        current_app.logger.info("第{0}页识别失败".format(str(jpg_index + 1)))
+
+                    if sn and student_no:
+                        if is_miss == "301":
+                            question_list = j_question.query.filter(j_question.paper_id == sn).all()
+                            with db.auto_commit():
+                                for question in question_list:
+                                    score_dict = {
+                                        "id": str(uuid.uuid1()),
+                                        "student_id": student_id,
+                                        "booklet_id": booklet_id,
+                                        "question_id": question.id,
+                                        "grade_by": "system-ocr",
+                                        "question_number": question.question_number,
+                                        "score": 0,
+                                        "question_url": None,
+                                        "status": "304"
+                                    }
+                                    score_instance = j_score.create(score_dict)
+                                    db.session.add(score_instance)
+                                booklet_dict = {
+                                    "id": booklet_id,
+                                    "paper_id": paper.id,
+                                    "student_id": student_id,
+                                    "status": "4",
+                                    "score": 0,
+                                    "grade_time": datetime.now().date(),
+                                    "url": pdf.pdf_url,
+                                    "upload_by": pdf.pdf_school,
+                                    "grade_num": None,
+                                    "upload_id": pdf.upload_id
+                                }
+                                booklet_instance = j_answer_booklet.create(booklet_dict)
+                                db.session.add(booklet_instance)
+
+                        else:
+                            if response_one and response_one["status"] == 200:
+                                result = response_one["data"]
+                                result_list = result["dirct"]
+                                for result_dict in result_list:
+                                    pic_path = result_dict["cut_image_path"]
+                                    # oss
+                                    auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
+                                    bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
+                                    file_fullname = pic_path.split(".")[0]
+                                    ext = pic_path.split(".")[1]
+                                    jpg_uuid = str(uuid.uuid1())
+
+                                    jpg_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + file_fullname + "-" + jpg_uuid + "." + ext
+                                    result = bucket.put_object_from_file(file_fullname + "-" + jpg_uuid + "." + ext,
+                                                                         pic_path)
+                                    current_app.logger.info(str(result))
+                                    if result_dict["type"] in ["21", "22", "23"]:
+                                        self._read_over_select_multi_judge(result_dict, paper, jpg_url, pdf, student_no,
+                                                                           booklet_id, page_one_url, student_no_id, student_name,
+                                                                           school_name, student_id)
+                                    if result_dict["type"] == "25":
+                                        self._read_over_fill(result_dict, paper, jpg_url, pdf, student_no,
+                                                                           booklet_id, page_one_url, student_no_id, student_name,
+                                                                           school_name, student_id, pdf.pdf_use)
+                                    if result_dict["type"] == "27":
+                                        self._read_over_answer(result_dict, paper, jpg_url, pdf, student_no,
+                                                             booklet_id, page_one_url, student_no_id, student_name,
+                                                             school_name, student_id, pdf.pdf_use)
+                            else:
+                                current_app.logger.info("第{0}页识别失败".format(str(jpg_index + 1)))
+
+                            response_two = self._use_ocr(pdf_path + jpg_dict[1], page_two_dict)
+                            if response_two and response_two["status"] == 200:
+                                result = response_two["data"]
+                                result_list = result["dirct"]
+                                for result_dict in result_list:
+                                    pic_path = result_dict["cut_image_path"]
+                                    # oss
+                                    auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
+                                    bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
+                                    file_fullname = pic_path.split(".")[0]
+                                    ext = pic_path.split(".")[1]
+                                    jpg_uuid = str(uuid.uuid1())
+
+                                    jpg_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + file_fullname + "-" + jpg_uuid + "." + ext
+                                    result = bucket.put_object_from_file(file_fullname + "-" + jpg_uuid + "." + ext,
+                                                                         pic_path)
+                                    current_app.logger.info(str(result))
+                                    if result_dict["type"] in ["21", "22", "23"]:
+                                        self._read_over_select_multi_judge(result_dict, paper, jpg_url, pdf, student_no,
+                                                                           booklet_id, page_two_url, student_no_id, student_name,
+                                                                           school_name, student_id)
+                                    if result_dict["type"] == "25":
+                                        self._read_over_fill(result_dict, paper, jpg_url, pdf, student_no,
+                                                                           booklet_id, page_two_url, student_no_id, student_name,
+                                                                           school_name, student_id, pdf.pdf_use)
+                                    if result_dict["type"] == "27":
+                                        self._read_over_answer(result_dict, paper, jpg_url, pdf, student_no,
+                                                             booklet_id, page_two_url, student_no_id, student_name,
+                                                             school_name, student_id, pdf.pdf_use)
+                            else:
+                                current_app.logger.info("第{0}页识别失败".format(str(jpg_index + 2)))
+
+                            response_three = self._use_ocr(pdf_path + jpg_dict[2], page_three_dict)
+                            if response_three and response_three["status"] == 200:
+                                result = response_three["data"]
+                                result_list = result["dirct"]
+                                for result_dict in result_list:
+                                    pic_path = result_dict["cut_image_path"]
+                                    # oss
+                                    auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
+                                    bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
+                                    file_fullname = pic_path.split(".")[0]
+                                    ext = pic_path.split(".")[1]
+                                    jpg_uuid = str(uuid.uuid1())
+
+                                    jpg_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + file_fullname + "-" + jpg_uuid + "." + ext
+                                    result = bucket.put_object_from_file(file_fullname + "-" + jpg_uuid + "." + ext,
+                                                                         pic_path)
+                                    current_app.logger.info(str(result))
+                                    if result_dict["type"] in ["21", "22", "23"]:
+                                        self._read_over_select_multi_judge(result_dict, paper, jpg_url, pdf, student_no,
+                                                                           booklet_id, page_three_url, student_no_id, student_name,
+                                                                           school_name, student_id)
+                                    if result_dict["type"] == "25":
+                                        self._read_over_fill(result_dict, paper, jpg_url, pdf, student_no,
+                                                                           booklet_id, page_three_url, student_no_id, student_name,
+                                                                           school_name, student_id, pdf.pdf_use)
+                                    if result_dict["type"] == "27":
+                                        self._read_over_answer(result_dict, paper, jpg_url, pdf, student_no,
+                                                             booklet_id, page_three_url, student_no_id, student_name,
+                                                             school_name, student_id, pdf.pdf_use)
+                            else:
+                                current_app.logger.info("第{0}页识别失败".format(str(jpg_index + 3)))
+
+                            response_four = self._use_ocr(pdf_path + jpg_dict[3], page_four_dict)
+                            if response_four and response_four["status"] == 200:
+                                result = response_four["data"]
+                                result_list = result["dirct"]
+                                for result_dict in result_list:
+                                    pic_path = result_dict["cut_image_path"]
+                                    # oss
+                                    auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
+                                    bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
+                                    file_fullname = pic_path.split(".")[0]
+                                    ext = pic_path.split(".")[1]
+                                    jpg_uuid = str(uuid.uuid1())
+
+                                    jpg_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + file_fullname + "-" + jpg_uuid + "." + ext
+                                    result = bucket.put_object_from_file(file_fullname + "-" + jpg_uuid + "." + ext,
+                                                                         pic_path)
+                                    current_app.logger.info(str(result))
+                                    if result_dict["type"] in ["21", "22", "23"]:
+                                        self._read_over_select_multi_judge(result_dict, paper, jpg_url, pdf, student_no,
+                                                                           booklet_id, page_four_url, student_no_id, student_name,
+                                                                           school_name, student_id)
+                                    if result_dict["type"] == "25":
+                                        self._read_over_fill(result_dict, paper, jpg_url, pdf, student_no,
+                                                                           booklet_id, page_four_url, student_no_id, student_name,
+                                                                           school_name, student_id, pdf.pdf_use)
+                                    if result_dict["type"] == "27":
+                                        self._read_over_answer(result_dict, paper, jpg_url, pdf, student_no,
+                                                             booklet_id, page_four_url, student_no_id, student_name,
+                                                             school_name, student_id, pdf.pdf_use)
+                            else:
+                                current_app.logger.info("第{0}页识别失败".format(str(jpg_index + 4)))
+
+                            scores_error = j_score.query.filter(j_score.booklet_id == booklet_id,
+                                                                j_score.status.in_(["303", "302"])).all()
+                            if not scores_error:
+                                booklet_status = "4"
+                                scores_all = j_score.query.filter(j_score.booklet_id == booklet_id,
+                                                                j_score.status == "304").all()
+                                booklet_score = 0
+                                for scores in scores_all:
+                                    booklet_score += scores.score
+                            else:
+                                booklet_status = "1"
+                                booklet_score = None
+                            booklet_dict = {
+                                "id": booklet_id,
+                                "paper_id": paper.id,
+                                "student_id": student_id,
+                                "status": booklet_status,
+                                "score": booklet_score,
+                                "grade_time": datetime.now().date(),
+                                "url": pdf.pdf_url,
+                                "upload_by": pdf.pdf_school,
+                                "grade_num": None,
+                                "upload_id": pdf.upload_id
+                            }
+                            with db.auto_commit():
+                                booklet_instance = j_answer_booklet.create(booklet_dict)
+                                db.session.add(booklet_instance)
+                    else:
+                        current_app.logger.info("该答卷识别失败,pdf_id:{0},失败页码为{1}-{2}"
+                                                .format(pdf.pdf_id, str(jpg_index + 1), str(jpg_index + 4)))
                     jpg_index += 4
-                current_app.logger.info(json.dumps(page_list))
-                return page_list
 
+                with db.auto_commit():
+                    pdf_use = j_answer_pdf.query.filter(j_answer_pdf.pdf_id == pdf.pdf_id).first()
+                    pdf_instance = pdf_use.update({
+                        "pdf_status": "300302"
+                    })
+                    db.session.add(pdf_instance)
+                    pdf_error_status = j_answer_pdf.query.filter(j_answer_pdf.upload_id == upload_id,
+                                                                 j_answer_pdf.pdf_status.in_(
+                                                                     ["300301", "300303", "300304"])).all()
+                    if not pdf_error_status:
+                        if pdf.pdf_use == "300201":
+                            upload_status = "无需分配"
+                        else:
+                            upload_status = "1"
+                    else:
+                        upload_status = "解析失败"
+                    upload = j_answer_upload.query.filter(j_answer_upload.id == upload_id).first()
+                    upload_instance = upload.update({
+                        "status": upload_status
+                    })
+                    db.session.add(upload_instance)
+
+                shutil.rmtree(pdf_path)
+
+        else:
+            current_app.logger.info(">>>>>>>>>>>>>>>>>>>>>>get_pdf_num:0")
 
     def _make_dict(self, page_dict, pdf):
         page_ocr_dict = {}
@@ -1407,3 +1757,520 @@ class COcr():
                     page_ocr_dict["ocr_dict"].append(dot_dict)
 
         return page_ocr_dict
+
+    def _read_over_select_multi_judge(self, result_dict, paper, jpg_url, pdf, student_no, booklet_id, page_url,
+                                      student_no_id, student_name, school_name, student_id):
+        with db.auto_commit():
+            score_id = str(uuid.uuid1())
+            if result_dict["ocr_result_status"] == "0":
+                status = 301
+                png_status = 304
+            else:
+                status = 303
+                png_status = 303
+            question = j_question.query.filter(j_question.paper_id == paper.id,
+                                               j_question.question_number == result_dict["index"]).first()
+            if result_dict["ocr_result"] in question.answer:
+                score = question.score
+            else:
+                score = 0
+            png_dict = {
+                "isdelete": 0,
+                "createtime": datetime.now(),
+                "updatetime": datetime.now(),
+                "png_id": str(uuid.uuid1()),
+                "png_url": jpg_url,
+                "pdf_id": pdf.pdf_id,
+                "png_result": student_no,
+                "png_status": status,
+                "png_type": result_dict["type"],
+                "question": question.content,
+                "booklet_id": booklet_id,
+                "page_url": page_url,
+                "student_no": student_no,
+                "student_no_id": student_no_id,
+                "student_name": student_name,
+                "school": school_name,
+                "result_score": score,
+                "result_update": score,
+                "score_id": score_id
+            }
+            score_dict = {
+                "id": score_id,
+                "student_id": student_id,
+                "booklet_id": booklet_id,
+                "question_id": question.id,
+                "grade_by": "system-ocr",
+                "question_number": result_dict["index"],
+                "score": score,
+                "question_url": jpg_url,
+                "status": png_status
+            }
+            png_instance = j_answer_png.create(png_dict)
+            db.session.add(png_instance)
+            score_instance = j_score.create(score_dict)
+            db.session.add(score_instance)
+
+    def _read_over_fill(self, result_dict, paper, jpg_url, pdf, student_no, booklet_id, page_url,
+                                      student_no_id, student_name, school_name, student_id, img_use):
+        if img_use == "300201":
+            # 已批阅
+            score_id = str(uuid.uuid1())
+            if result_dict["ocr_result_status"] == "0":
+                status = 301
+                png_status = 304
+            else:
+                status = 303
+                png_status = 303
+            question = j_question.query.filter(j_question.paper_id == paper.id,
+                                               j_question.question_number == result_dict["index"]).first()
+            if result_dict["ocr_result"] in question.answer:
+                score = question.score
+            else:
+                score = 0
+            png_dict = {
+                "isdelete": 0,
+                "createtime": datetime.now(),
+                "updatetime": datetime.now(),
+                "png_id": str(uuid.uuid1()),
+                "png_url": jpg_url,
+                "pdf_id": pdf.pdf_id,
+                "png_result": student_no,
+                "png_status": status,
+                "png_type": result_dict["type"],
+                "question": question.content,
+                "booklet_id": booklet_id,
+                "page_url": page_url,
+                "student_no": student_no,
+                "student_no_id": student_no_id,
+                "student_name": student_name,
+                "school": school_name,
+                "result_score": score,
+                "result_update": score,
+                "score_id": score_id
+            }
+            score_dict = {
+                "id": score_id,
+                "student_id": student_id,
+                "booklet_id": booklet_id,
+                "question_id": question.id,
+                "grade_by": "system-ocr",
+                "question_number": result_dict["index"],
+                "score": score,
+                "question_url": jpg_url,
+                "status": png_status
+            }
+        else:
+            # 未批阅
+            score_id = str(uuid.uuid1())
+            if result_dict["ocr_result_status"] == "0":
+                status = 304
+                png_status = 302
+            else:
+                status = 303
+                png_status = 303
+            question = j_question.query.filter(j_question.paper_id == paper.id,
+                                               j_question.question_number == result_dict["index"]).first()
+            if result_dict["ocr_result"] in question.answer:
+                score = question.score
+            else:
+                score = 0
+            png_dict = {
+                "isdelete": 0,
+                "createtime": datetime.now(),
+                "updatetime": datetime.now(),
+                "png_id": str(uuid.uuid1()),
+                "png_url": jpg_url,
+                "pdf_id": pdf.pdf_id,
+                "png_result": student_no,
+                "png_status": status,
+                "png_type": "24",
+                "question": question.content,
+                "booklet_id": booklet_id,
+                "page_url": page_url,
+                "student_no": student_no,
+                "student_no_id": student_no_id,
+                "student_name": student_name,
+                "school": school_name,
+                "result_score": None,
+                "result_update": None,
+                "score_id": score_id
+            }
+            score_dict = {
+                "id": score_id,
+                "student_id": student_id,
+                "booklet_id": booklet_id,
+                "question_id": question.id,
+                "grade_by": "system-ocr",
+                "question_number": result_dict["index"],
+                "score": score,
+                "question_url": jpg_url,
+                "status": png_status
+            }
+        with db.auto_commit():
+            png_instance = j_answer_png.create(png_dict)
+            score_instance = j_score.create(score_dict)
+            db.session.add(png_instance)
+            db.session.add(score_instance)
+
+    def _read_over_answer(self, result_dict, paper, jpg_url, pdf, student_no, booklet_id, page_url,
+                                      student_no_id, student_name, school_name, student_id, img_use):
+        if img_use == "300201":
+            # 已批阅
+            score_id = str(uuid.uuid1())
+            if result_dict["ocr_result_status"] == "0":
+                status = 301
+                png_status = 304
+            else:
+                status = 303
+                png_status = 303
+            question = j_question.query.filter(j_question.paper_id == paper.id,
+                                               j_question.question_number == result_dict["index"]).first()
+            if result_dict["ocr_result"] in question.answer:
+                score = question.score
+            else:
+                score = 0
+            png_dict = {
+                "isdelete": 0,
+                "createtime": datetime.now(),
+                "updatetime": datetime.now(),
+                "png_id": str(uuid.uuid1()),
+                "png_url": jpg_url,
+                "pdf_id": pdf.pdf_id,
+                "png_result": student_no,
+                "png_status": status,
+                "png_type": result_dict["type"],
+                "question": question.content,
+                "booklet_id": booklet_id,
+                "page_url": page_url,
+                "student_no": student_no,
+                "student_no_id": student_no_id,
+                "student_name": student_name,
+                "school": school_name,
+                "result_score": score,
+                "result_update": score,
+                "score_id": score_id
+            }
+            score_dict = {
+                "id": score_id,
+                "student_id": student_id,
+                "booklet_id": booklet_id,
+                "question_id": question.id,
+                "grade_by": "system-ocr",
+                "question_number": result_dict["index"],
+                "score": score,
+                "question_url": jpg_url,
+                "status": png_status
+            }
+        else:
+            # 未批阅
+            score_id = str(uuid.uuid1())
+            if result_dict["ocr_result_status"] == "0":
+                status = 304
+                png_status = 302
+            else:
+                status = 303
+                png_status = 303
+            question = j_question.query.filter(j_question.paper_id == paper.id,
+                                               j_question.question_number == result_dict["index"]).first()
+            if result_dict["ocr_result"] in question.answer:
+                score = question.score
+            else:
+                score = 0
+            png_dict = {
+                "isdelete": 0,
+                "createtime": datetime.now(),
+                "updatetime": datetime.now(),
+                "png_id": str(uuid.uuid1()),
+                "png_url": jpg_url,
+                "pdf_id": pdf.pdf_id,
+                "png_result": student_no,
+                "png_status": status,
+                "png_type": "26",
+                "question": question.content,
+                "booklet_id": booklet_id,
+                "page_url": page_url,
+                "student_no": student_no,
+                "student_no_id": student_no_id,
+                "student_name": student_name,
+                "school": school_name,
+                "result_score": None,
+                "result_update": None,
+                "score_id": score_id
+            }
+            score_dict = {
+                "id": score_id,
+                "student_id": student_id,
+                "booklet_id": booklet_id,
+                "question_id": question.id,
+                "grade_by": "system-ocr",
+                "question_number": result_dict["index"],
+                "score": score,
+                "question_url": jpg_url,
+                "status": png_status
+            }
+        with db.auto_commit():
+            png_instance = j_answer_png.create(png_dict)
+            score_instance = j_score.create(score_dict)
+            db.session.add(png_instance)
+            db.session.add(score_instance)
+
+
+    def get_pdf(self):
+        args = parameter_required(("pdf_status",))
+        if args.get("pdf_status") == "300306":
+            pdf = j_answer_pdf.query.filter(j_answer_pdf.isdelete == 0, j_answer_pdf.pdf_status == "300306") \
+                .order_by(j_answer_pdf.createtime.desc()).first()
+            if pdf and pdf.pdf_ip:
+
+                pdf_url = pdf.pdf_url
+                pdf_uuid = str(uuid.uuid1())
+                # 创建pdf存储路径
+                if platform.system() == "Windows":
+                    pdf_path = "D:\\jinrui_pdf\\" + pdf_uuid + "\\"
+                else:
+                    pdf_path = "/tmp/jinrui_pdf/" + pdf_uuid + "/"
+                if not os.path.exists(pdf_path):
+                    os.makedirs(pdf_path)
+
+                auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
+                bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
+
+                pdf_name = pdf_url.split("/")
+                pdf_save_path = pdf_path + pdf_name[-1]
+                # 存储pdf到本地
+                result = bucket.get_object_to_file(pdf_name[-1], pdf_save_path)
+
+                if result.status != 200:
+                    with db.auto_commit():
+                        pdf_use = j_answer_pdf.query.filter(j_answer_pdf.pdf_id == pdf.pdf_id).first()
+                        pdf_instance = pdf_use.update({
+                            "pdf_status": "300303"
+                        })
+                        db.session.add(pdf_instance)
+                    return {
+                        "status": 405,
+                        "message": "未找到可用pdf"
+                    }
+                else:
+                    with db.auto_commit():
+                        pdf_use = j_answer_pdf.query.filter(j_answer_pdf.pdf_id == pdf.pdf_id).first()
+                        print(pdf_use.createtime)
+                        pdf_instance = pdf_use.update({
+                            "pdf_status": "300305"
+                        })
+                        db.session.add(pdf_instance)
+
+                    jpg_dir = self._conver_img(pdf_path, pdf_save_path, pdf_name[-1])
+
+                    current_app.logger.info(jpg_dir)
+                    current_app.logger.info(pdf.sheet_dict)
+
+                    page_ond_dict = {}
+                    page_two_dict = {}
+                    page_three_dict = {}
+                    page_four_dict = {}
+                    for page_dict in json.loads(pdf.sheet_dict):
+                        current_app.logger.info(page_dict)
+                        if page_dict["page"] == 1:
+                            page_ond_dict = self._make_dict(page_dict, pdf)
+                        elif page_dict["page"] == 2:
+                            page_two_dict = self._make_dict(page_dict, pdf)
+                        elif page_dict["page"] == 3:
+                            page_three_dict = self._make_dict(page_dict, pdf)
+                        elif page_dict["page"] == 4:
+                            page_four_dict = self._make_dict(page_dict, pdf)
+
+                    jpg_index = 0
+                    page_list = []
+                    while jpg_index < len(jpg_dir):
+                        jpg_dict = jpg_dir[jpg_index: jpg_index + 4]
+                        page_one = {
+                            "jpg_path": pdf_path + jpg_dict[0],
+                            "json_dict": page_ond_dict
+                        }
+                        page_list.append(page_one)
+                        page_two = {
+                            "jpg_path": pdf_path + jpg_dict[1],
+                            "json_dict": page_two_dict
+                        }
+                        page_list.append(page_two)
+                        page_three = {
+                            "jpg_path": pdf_path + jpg_dict[2],
+                            "json_dict": page_three_dict
+                        }
+                        page_list.append(page_three)
+                        page_four = {
+                            "jpg_path": pdf_path + jpg_dict[3],
+                            "json_dict": page_four_dict
+                        }
+                        page_list.append(page_four)
+
+                        jpg_index += 4
+                    current_app.logger.info(json.dumps(page_list))
+                    return page_list
+        elif args.get("pdf_status") == "300303":
+            pdf = j_answer_pdf.query.filter(j_answer_pdf.isdelete == 0, j_answer_pdf.pdf_status == "300303") \
+                .order_by(j_answer_pdf.createtime.desc()).first()
+            if pdf and pdf.pdf_ip:
+
+                pdf_url = pdf.pdf_url
+                pdf_uuid = str(uuid.uuid1())
+                # 创建pdf存储路径
+                if platform.system() == "Windows":
+                    pdf_path = "D:\\jinrui_pdf\\" + pdf_uuid + "\\"
+                else:
+                    pdf_path = "/tmp/jinrui_pdf/" + pdf_uuid + "/"
+                if not os.path.exists(pdf_path):
+                    os.makedirs(pdf_path)
+
+                auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
+                bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
+
+                pdf_name = pdf_url.split("/")
+                pdf_save_path = pdf_path + pdf_name[-1]
+                # 存储pdf到本地
+                result = bucket.get_object_to_file(pdf_name[-1], pdf_save_path)
+
+                if result.status != 200:
+                    with db.auto_commit():
+                        pdf_use = j_answer_pdf.query.filter(j_answer_pdf.pdf_id == pdf.pdf_id).first()
+                        pdf_instance = pdf_use.update({
+                            "pdf_status": "300303"
+                        })
+                        db.session.add(pdf_instance)
+                    return {
+                        "status": 405,
+                        "message": "未找到可用pdf"
+                    }
+                else:
+                    with db.auto_commit():
+                        pdf_use = j_answer_pdf.query.filter(j_answer_pdf.pdf_id == pdf.pdf_id).first()
+                        # print(pdf_use.createtime)
+                        pdf_instance = pdf_use.update({
+                            "pdf_status": "300305"
+                        })
+                        db.session.add(pdf_instance)
+
+                    jpg_dir = self._conver_img(pdf_path, pdf_save_path, pdf_name[-1])
+
+                    current_app.logger.info(jpg_dir)
+                    current_app.logger.info(pdf.sheet_dict)
+
+                    page_ond_dict = {}
+                    page_two_dict = {}
+                    page_three_dict = {}
+                    page_four_dict = {}
+                    for page_dict in json.loads(pdf.sheet_dict):
+                        current_app.logger.info(page_dict)
+                        if page_dict["page"] == 1:
+                            page_ond_dict = self._make_dict(page_dict, pdf)
+                        elif page_dict["page"] == 2:
+                            page_two_dict = self._make_dict(page_dict, pdf)
+                        elif page_dict["page"] == 3:
+                            page_three_dict = self._make_dict(page_dict, pdf)
+                        elif page_dict["page"] == 4:
+                            page_four_dict = self._make_dict(page_dict, pdf)
+
+                    jpg_index = 0
+                    page_list = []
+                    while jpg_index < len(jpg_dir):
+                        jpg_dict = jpg_dir[jpg_index: jpg_index + 4]
+                        page_one = {
+                            "jpg_path": pdf_path + jpg_dict[0],
+                            "json_dict": page_ond_dict
+                        }
+                        page_list.append(page_one)
+                        page_two = {
+                            "jpg_path": pdf_path + jpg_dict[1],
+                            "json_dict": page_two_dict
+                        }
+                        page_list.append(page_two)
+                        page_three = {
+                            "jpg_path": pdf_path + jpg_dict[2],
+                            "json_dict": page_three_dict
+                        }
+                        page_list.append(page_three)
+                        page_four = {
+                            "jpg_path": pdf_path + jpg_dict[3],
+                            "json_dict": page_four_dict
+                        }
+                        page_list.append(page_four)
+
+                        jpg_index += 4
+                    current_app.logger.info(json.dumps(page_list))
+                    return page_list
+
+    def mock_pdf(self):
+        data = parameter_required(("file", "paper_name", "pdf_use"))
+        from flask import request
+        file = request.files.get("file")
+        if not file:
+            return {
+                "code": 405,
+                "success": False,
+                "message": "未发现文件"
+            }
+        filename = file.filename
+        etx = os.path.splitext(filename)[-1]
+        # 阿里云oss参数
+        auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
+        bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
+
+        file_uuid = str(uuid.uuid1())
+        file_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + "file-" + file_uuid + etx
+        result = bucket.put_object("file-" + file_uuid + etx, file)
+        if result.status != 200:
+            return {
+                "code": 405,
+                "success": False,
+                "message": "阿里云oss错误"
+            }
+        current_app.logger.info(">>>>>>>>>>>>>>>>>>>oss_status:" + str(result))
+
+        paper = j_paper.query.filter(j_paper.name == data.get("paper_name")).first_("未找到试卷")
+        sheet_id = paper.sheet_id
+        if not sheet_id:
+            return {
+                "status": 405,
+                "message": "该试卷无答题卡，请先创建"
+            }
+        sheet = j_answer_sheet.query.filter(j_answer_sheet.id == sheet_id).first_("答题卡数据异常")
+        pdf_dict = {
+            "isdelete": 0,
+            "createtime": datetime.now(),
+            "updatetime": datetime.now(),
+            "pdf_id": str(uuid.uuid1()),
+            "zip_id": None,
+            "pdf_use": data.get("pdf_use"),
+            "paper_name": data.get("paper_name"),
+            "sheet_dict": sheet.id,
+            "pdf_status": "300306",
+            "pdf_url": file_url,
+            "pdf_address": "zip",
+            "pdf_school": "杭州崇德培训学校",
+            "pdf_ip": "115.198.170.61",
+            "upload_id": None
+        }
+        with db.auto_commit():
+            pdf_instance = j_answer_pdf.create(pdf_dict)
+            db.session.add(pdf_instance)
+
+        return {
+            "status": 200,
+            "message": "mock数据成功"
+        }
+
+    def fix_ocr_bugs(self):
+        pdf = j_answer_pdf.query.filter(j_answer_pdf.isdelete == 0, j_answer_pdf.pdf_status == "300303") \
+            .order_by(j_answer_pdf.createtime.desc()).first()
+        with db.auto_commit():
+            pdf_instance = pdf.update({
+                "pdf_status": "300304"
+            })
+            db.session.add(pdf_instance)
+
+        return {
+            "status": 200,
+            "message": "清理数据成功"
+        }
