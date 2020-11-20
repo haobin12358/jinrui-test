@@ -37,7 +37,7 @@ from jinrui.extensions.register_ext import celery, db
 def ocr_fix():
     try:
         from jinrui.control.COcr import COcr
-        cocr = COcr().deal_pdf()
+        cocr = COcr().mock_booklet()
     except:
         current_app.logger.info(">>>>>>>>>>>>>>异常的ocr任务")
 

@@ -12,7 +12,17 @@ class AOcr(Resource):
             'mock_answer': self.cocr.mock_answer,
             "mock_ocr_response": self.cocr.mock_ocr_response,
             "deal_pdf": self.cocr.deal_pdf,
-            "get_pdf": self.cocr.get_pdf
+            "get_pdf": self.cocr.get_pdf,
+            "mock_booklet": self.cocr.mock_booklet,
+            "fix_ocr_bugs": self.cocr.fix_ocr_bugs
+        }
+
+        return apis
+
+    def post(self, ocr):
+        apis = {
+            "mock_ocr_response": self.cocr.mock_ocr_response,
+            "mock_pdf": self.cocr.mock_pdf
         }
 
         return apis
