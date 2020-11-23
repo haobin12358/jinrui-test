@@ -45,6 +45,9 @@ class j_question(Base):
     create_time = Column(DateTime)
     update_time = Column(DateTime)
     url = Column(Text)
+    contenthtml = Column(Text, comment='题干html')
+    answerhtml = Column(Text, comment='答案html')
+    explanationhtml = Column(Text, comment='答案html')
 
 class j_student(Base):
     """
