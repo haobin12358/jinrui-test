@@ -84,6 +84,8 @@ def auto_setpic():
             update_list = []
             for jp in jplist:
                 paper_dict = {}
+                img_paper_dict = {}
+                img_answer_dict = {}
                 answer_dict = {}
                 encode_tag = '1'
                 if jp.doc_url:
@@ -91,7 +93,7 @@ def auto_setpic():
 
                     try:
                         doc_path = _get_fetch(jp.doc_url)
-                        paper_dict = cp.transfordoc(doc_path)
+                        paper_dict, img_paper_dict = cp.analysis_word(doc_path)
                     except Exception as e:
                         current_app.logger.error('解析 doc 失败 pageid = {} {}'.format(jp.id, e))
                         encode_tag = '2'
@@ -99,7 +101,7 @@ def auto_setpic():
                 if jp.answer_doc_url:
                     try:
                         answer_path = _get_fetch(jp.answer_doc_url)
-                        answer_dict = cp.transfordoc(answer_path)
+                        answer_dict, img_answer_dict = cp.analysis_word(answer_path)
                     except Exception as e:
                         current_app.logger.error('解析answer 失败 pageid = {} {}'.format(jp.id, e))
                         encode_tag = '3'
@@ -108,7 +110,11 @@ def auto_setpic():
                         j_question.paper_id == jp.id, j_question.question_number == paper_num).first()
                     if not question:
                         continue
-                    question.update({'content': paper_dict.get(paper_num), 'answer': answer_dict.get(paper_num)})
+                    question.update({
+                        'content': img_paper_dict.get(paper_num),
+                        'answer': img_answer_dict.get(paper_num),
+                        'contenthtml': paper_dict.get(paper_num),
+                        'answerhtml': answer_dict.get(paper_num)})
                     update_list.append(question)
                 jp.encode_tag = encode_tag
                 update_list.append(jp)
