@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from sqlalchemy import Integer, String, Text, DateTime, orm, Boolean, DATE
+from sqlalchemy.dialects.mysql import LONGTEXT
 from jinrui.extensions.base_model import Base, Column
 from datetime import datetime
 
@@ -45,9 +46,11 @@ class j_question(Base):
     create_time = Column(DateTime)
     update_time = Column(DateTime)
     url = Column(Text)
-    contenthtml = Column(Text, comment="题干")
-    answerhtml = Column(Text, comment="答案")
-    explanationhtml = Column(Text, comment="题目解析")
+
+    contenthtml = Column(LONGTEXT, comment='题干html')
+    answerhtml = Column(LONGTEXT, comment='答案html')
+    explanationhtml = Column(LONGTEXT, comment='答案html')
+
 
 class j_student(Base):
     """
