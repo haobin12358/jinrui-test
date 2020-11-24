@@ -627,8 +627,6 @@ class COcr():
             trans = fitz.Matrix(zoom_x, zoom_y).preRotate(rotate)
             png_uuid = "png" + str(uuid.uuid1())
             pm = page.getPixmap(matrix=trans, alpha=False)
-            print(pm.height)
-            print(pm.width)
             if platform.system() == "Windows":
                 pm.writePNG(pdf_path + '{0}-{1}.png'.format(png_uuid, "%04d" % i))
                 jpg_dir.append('{0}-{1}.png'.format(png_uuid, "%04d" % i))
@@ -1145,9 +1143,11 @@ class COcr():
             pdf_save_path = pdf_path + pdf_name[-1]
             # 存储pdf到本地
             result = bucket.get_object_to_file(pdf_name[-1], pdf_save_path)
+            current_app.logger.info(">>>>>>>>>>>>>>>oss:" + str(result.status))
 
             paper_name = pdf.paper_name
-            paper = j_paper.query.filter(j_paper.paper_name == paper_name).first()
+
+            paper = j_paper.query.filter(j_paper.name == paper_name).first()
 
             if result.status != 200:
                 with db.auto_commit():
@@ -1165,6 +1165,7 @@ class COcr():
                     })
                     db.session.add(pdf_instance)
 
+                current_app.logger.info(">>>>>>>>>>>>update_pdf_status")
                 jpg_dir = self._conver_img(pdf_path, pdf_save_path, pdf_name[-1])
 
                 current_app.logger.info(jpg_dir)
@@ -1188,40 +1189,42 @@ class COcr():
                 jpg_index = 0
                 while jpg_index < len(jpg_dir):
                     jpg_dict = jpg_dir[jpg_index: jpg_index + 4]
+                    current_app.logger.info(jpg_dict)
                     response_one = self._use_ocr(pdf_path + jpg_dict[0], page_one_dict)
+                    current_app.logger.info(">>>>>>>>>>>>>>>>>>>>>>>>>第一张图片算法返回：" + str(response_one))
                     # oss
                     auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
                     bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
-                    page_one_file_fullname = (pdf_path + jpg_dict[0]).split(".")[0]
+                    page_one_file_fullname = (pdf_path.replace("/tmp", "tmp") + jpg_dict[0]).split(".")[0]
                     page_one_ext = (pdf_path + jpg_dict[0]).split(".")[1]
                     jpg_uuid = str(uuid.uuid1())
 
                     page_one_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + page_one_file_fullname + "-" + jpg_uuid + "." + page_one_ext
-                    result = bucket.put_object_from_file(page_one_file_fullname + "-" + jpg_uuid + "." + page_one_ext,
+                    result = bucket.put_object_from_file(page_one_file_fullname + "." + page_one_ext,
                                                          pdf_path + jpg_dict[0])
                     current_app.logger.info(str(result))
 
-                    page_two_file_fullname = (pdf_path + jpg_dict[0]).split(".")[0]
+                    page_two_file_fullname = (pdf_path.replace("/tmp", "tmp") + jpg_dict[0]).split(".")[0]
                     page_two_ext = (pdf_path + jpg_dict[0]).split(".")[1]
 
                     page_two_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + page_two_file_fullname + "-" + jpg_uuid + "." + page_two_ext
-                    result = bucket.put_object_from_file(page_two_file_fullname + "-" + jpg_uuid + "." + page_two_ext,
+                    result = bucket.put_object_from_file(page_two_file_fullname + "." + page_two_ext,
                                                          pdf_path + jpg_dict[0])
                     current_app.logger.info(str(result))
 
-                    page_three_file_fullname = (pdf_path + jpg_dict[0]).split(".")[0]
+                    page_three_file_fullname = (pdf_path.replace("/tmp", "tmp") + jpg_dict[0]).split(".")[0]
                     page_three_ext = (pdf_path + jpg_dict[0]).split(".")[1]
 
                     page_three_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + page_three_file_fullname + "-" + jpg_uuid + "." + page_three_ext
-                    result = bucket.put_object_from_file(page_three_file_fullname + "-" + jpg_uuid + "." + page_three_ext,
+                    result = bucket.put_object_from_file(page_three_file_fullname + "." + page_three_ext,
                                                          pdf_path + jpg_dict[0])
                     current_app.logger.info(str(result))
 
-                    page_four_file_fullname = (pdf_path + jpg_dict[0]).split(".")[0]
+                    page_four_file_fullname = (pdf_path.replace("/tmp", "tmp") + jpg_dict[0]).split(".")[0]
                     page_four_ext = (pdf_path + jpg_dict[0]).split(".")[1]
 
                     page_four_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + page_four_file_fullname + "-" + jpg_uuid + "." + page_four_ext
-                    result = bucket.put_object_from_file(page_four_file_fullname + "-" + jpg_uuid + "." + page_four_ext,
+                    result = bucket.put_object_from_file(page_four_file_fullname + "." + page_four_ext,
                                                          pdf_path + jpg_dict[0])
                     current_app.logger.info(str(result))
 
@@ -1233,25 +1236,28 @@ class COcr():
                     student_id = None
                     is_miss = "302"
 
-                    if response_one and response_one["status"] == 200:
+                    if response_one and response_one["status"] == "200":
                         result = response_one["data"]
                         result_list = result["dirct"]
                         for result_dict in result_list:
                             if result_dict["index"] == "-3":
                                 sn = result_dict["ocr_result"]
                                 paper = j_paper.query.filter(j_paper.id == sn).first()
-                                if paper and paper.paper_name == pdf.paper_name:
+                                current_app.logger.info(">>>>>>>>>>>>>>sn:" + sn)
+                                current_app.logger.info(">>>>>>>>>>>>>>jpg_index:" + str(jpg_index))
+                                current_app.logger.info(">>>>>>>>>>>>>>page_one_url:" + page_one_url)
+                                if paper and paper.name == pdf.paper_name:
                                     status = "301"
-                                    pic_path = result_dict["cut_image_path"]
+                                    pic_path = result_dict["cut_img_path"]
                                     # oss
                                     auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
                                     bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
-                                    file_fullname = pic_path.split(".")[0]
+                                    file_fullname = pic_path.replace("/tmp", "tmp").split(".")[0]
                                     ext = pic_path.split(".")[1]
                                     jpg_uuid = str(uuid.uuid1())
 
                                     jpg_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + file_fullname + "-" + jpg_uuid + "." + ext
-                                    result = bucket.put_object_from_file(file_fullname + "-" + jpg_uuid + "." + ext,
+                                    result = bucket.put_object_from_file(file_fullname + "." + ext,
                                                                          pic_path)
                                     current_app.logger.info(str(result))
                                     student_no_id = str(uuid.uuid1())
@@ -1302,16 +1308,16 @@ class COcr():
                                     status = 303
                                     student_name = None
                                     student_id = None
-                                pic_path = result_dict["cut_image_path"]
+                                pic_path = result_dict["cut_img_path"]
                                 # oss
                                 auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
                                 bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
-                                file_fullname = pic_path.split(".")[0]
+                                file_fullname = pic_path.replace("/tmp", "tmp").split(".")[0]
                                 ext = pic_path.split(".")[1]
                                 jpg_uuid = str(uuid.uuid1())
 
                                 jpg_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + file_fullname + "-" + jpg_uuid + "." + ext
-                                result = bucket.put_object_from_file(file_fullname + "-" + jpg_uuid + "." + ext,
+                                result = bucket.put_object_from_file(file_fullname + "." + ext,
                                                                      pic_path)
                                 current_app.logger.info(str(result))
                                 student_no_id = str(uuid.uuid1())
@@ -1376,20 +1382,20 @@ class COcr():
                                 db.session.add(booklet_instance)
 
                         else:
-                            if response_one and response_one["status"] == 200:
+                            if response_one and response_one["status"] == "200":
                                 result = response_one["data"]
                                 result_list = result["dirct"]
                                 for result_dict in result_list:
-                                    pic_path = result_dict["cut_image_path"]
+                                    pic_path = result_dict["cut_img_path"]
                                     # oss
                                     auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
                                     bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
-                                    file_fullname = pic_path.split(".")[0]
+                                    file_fullname = pic_path.replace("/tmp", "tmp").split(".")[0]
                                     ext = pic_path.split(".")[1]
                                     jpg_uuid = str(uuid.uuid1())
 
                                     jpg_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + file_fullname + "-" + jpg_uuid + "." + ext
-                                    result = bucket.put_object_from_file(file_fullname + "-" + jpg_uuid + "." + ext,
+                                    result = bucket.put_object_from_file(file_fullname + "." + ext,
                                                                          pic_path)
                                     current_app.logger.info(str(result))
                                     if result_dict["type"] in ["21", "22", "23"]:
@@ -1408,20 +1414,20 @@ class COcr():
                                 current_app.logger.info("第{0}页识别失败".format(str(jpg_index + 1)))
 
                             response_two = self._use_ocr(pdf_path + jpg_dict[1], page_two_dict)
-                            if response_two and response_two["status"] == 200:
+                            if response_two and response_two["status"] == "200":
                                 result = response_two["data"]
                                 result_list = result["dirct"]
                                 for result_dict in result_list:
-                                    pic_path = result_dict["cut_image_path"]
+                                    pic_path = result_dict["cut_img_path"]
                                     # oss
                                     auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
                                     bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
-                                    file_fullname = pic_path.split(".")[0]
+                                    file_fullname = pic_path.replace("/tmp", "tmp").split(".")[0]
                                     ext = pic_path.split(".")[1]
                                     jpg_uuid = str(uuid.uuid1())
 
                                     jpg_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + file_fullname + "-" + jpg_uuid + "." + ext
-                                    result = bucket.put_object_from_file(file_fullname + "-" + jpg_uuid + "." + ext,
+                                    result = bucket.put_object_from_file(file_fullname + "." + ext,
                                                                          pic_path)
                                     current_app.logger.info(str(result))
                                     if result_dict["type"] in ["21", "22", "23"]:
@@ -1440,20 +1446,20 @@ class COcr():
                                 current_app.logger.info("第{0}页识别失败".format(str(jpg_index + 2)))
 
                             response_three = self._use_ocr(pdf_path + jpg_dict[2], page_three_dict)
-                            if response_three and response_three["status"] == 200:
+                            if response_three and response_three["status"] == "200":
                                 result = response_three["data"]
                                 result_list = result["dirct"]
                                 for result_dict in result_list:
-                                    pic_path = result_dict["cut_image_path"]
+                                    pic_path = result_dict["cut_img_path"]
                                     # oss
                                     auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
                                     bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
-                                    file_fullname = pic_path.split(".")[0]
+                                    file_fullname = pic_path.replace("/tmp", "tmp").split(".")[0]
                                     ext = pic_path.split(".")[1]
                                     jpg_uuid = str(uuid.uuid1())
 
                                     jpg_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + file_fullname + "-" + jpg_uuid + "." + ext
-                                    result = bucket.put_object_from_file(file_fullname + "-" + jpg_uuid + "." + ext,
+                                    result = bucket.put_object_from_file(file_fullname + "." + ext,
                                                                          pic_path)
                                     current_app.logger.info(str(result))
                                     if result_dict["type"] in ["21", "22", "23"]:
@@ -1472,20 +1478,20 @@ class COcr():
                                 current_app.logger.info("第{0}页识别失败".format(str(jpg_index + 3)))
 
                             response_four = self._use_ocr(pdf_path + jpg_dict[3], page_four_dict)
-                            if response_four and response_four["status"] == 200:
+                            if response_four and response_four["status"] == "200":
                                 result = response_four["data"]
                                 result_list = result["dirct"]
                                 for result_dict in result_list:
-                                    pic_path = result_dict["cut_image_path"]
+                                    pic_path = result_dict["cut_img_path"]
                                     # oss
                                     auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
                                     bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
-                                    file_fullname = pic_path.split(".")[0]
+                                    file_fullname = pic_path.replace("/tmp", "tmp").split(".")[0]
                                     ext = pic_path.split(".")[1]
                                     jpg_uuid = str(uuid.uuid1())
 
                                     jpg_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + file_fullname + "-" + jpg_uuid + "." + ext
-                                    result = bucket.put_object_from_file(file_fullname + "-" + jpg_uuid + "." + ext,
+                                    result = bucket.put_object_from_file(file_fullname + "." + ext,
                                                                          pic_path)
                                     current_app.logger.info(str(result))
                                     if result_dict["type"] in ["21", "22", "23"]:
@@ -1522,7 +1528,7 @@ class COcr():
                                 "status": booklet_status,
                                 "score": booklet_score,
                                 "grade_time": datetime.now().date(),
-                                "url": pdf.pdf_url,
+                                "url": json.dumps([page_one_url, page_two_url, page_three_url, page_four_url]),
                                 "upload_by": pdf.pdf_school,
                                 "grade_num": None,
                                 "upload_id": pdf.upload_id
@@ -2055,9 +2061,8 @@ class COcr():
                 else:
                     with db.auto_commit():
                         pdf_use = j_answer_pdf.query.filter(j_answer_pdf.pdf_id == pdf.pdf_id).first()
-                        print(pdf_use.createtime)
                         pdf_instance = pdf_use.update({
-                            "pdf_status": "300305"
+                            "pdf_status": "300306"
                         })
                         db.session.add(pdf_instance)
 
@@ -2148,7 +2153,7 @@ class COcr():
                         pdf_use = j_answer_pdf.query.filter(j_answer_pdf.pdf_id == pdf.pdf_id).first()
                         # print(pdf_use.createtime)
                         pdf_instance = pdf_use.update({
-                            "pdf_status": "300305"
+                            "pdf_status": "300303"
                         })
                         db.session.add(pdf_instance)
 
@@ -2202,9 +2207,10 @@ class COcr():
                     return page_list
 
     def mock_pdf(self):
-        data = parameter_required(("file", "paper_name", "pdf_use"))
+        # data = parameter_required(("file", "paper_name", "pdf_use"))
         from flask import request
         file = request.files.get("file")
+        data = request.form
         if not file:
             return {
                 "code": 405,
@@ -2244,7 +2250,7 @@ class COcr():
             "zip_id": None,
             "pdf_use": data.get("pdf_use"),
             "paper_name": data.get("paper_name"),
-            "sheet_dict": sheet.id,
+            "sheet_dict": sheet.json,
             "pdf_status": "300306",
             "pdf_url": file_url,
             "pdf_address": "zip",
