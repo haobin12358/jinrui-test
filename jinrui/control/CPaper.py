@@ -154,7 +154,7 @@ class CPaper():
                     }
                     response.append(select_dict)
 
-            elif question.type == "解答题":
+            elif question.type in ["解答题", "计算题"]:
                 now_question_type = self._get_question_en(question.type)
                 big_question_number = big_question_number + 1
                 start = int(question.question_number)
@@ -200,7 +200,7 @@ class CPaper():
         }
 
     def _get_question_en(self, cn_question):
-        en_question_dict = ["select", "multi", "judge", "fill", "answer"]
-        ch_question_dict = ["选择题", "多选题", "判断题", "填空题", "解答题"]
+        en_question_dict = ["select", "multi", "judge", "fill", "answer", "answer"]
+        ch_question_dict = ["选择题", "多选题", "判断题", "填空题", "解答题", "计算题"]
         index = ch_question_dict.index(cn_question)
         return en_question_dict[index]
