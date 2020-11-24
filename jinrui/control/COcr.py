@@ -1528,7 +1528,7 @@ class COcr():
                                 "status": booklet_status,
                                 "score": booklet_score,
                                 "grade_time": datetime.now().date(),
-                                "url": pdf.pdf_url,
+                                "url": json.dumps([page_one_url, page_two_url, page_three_url, page_four_url]),
                                 "upload_by": pdf.pdf_school,
                                 "grade_num": None,
                                 "upload_id": pdf.upload_id
