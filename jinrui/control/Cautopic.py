@@ -946,5 +946,5 @@ class CAutopic():
         except:
             current_app.logger.error('转化docx 到 html error ')
             return ''
-        current_app.logger.info('get html path {}'.format(html_path))
+        current_app.logger.info('{} get html path {}'.format(docx_path, html_path))
         return html_path
