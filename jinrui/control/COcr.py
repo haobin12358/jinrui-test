@@ -1199,7 +1199,7 @@ class COcr():
                     page_one_ext = (pdf_path + jpg_dict[0]).split(".")[1]
                     jpg_uuid = str(uuid.uuid1())
 
-                    page_one_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + page_one_file_fullname + "-" + jpg_uuid + "." + page_one_ext
+                    page_one_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + page_one_file_fullname + "." + page_one_ext
                     result = bucket.put_object_from_file(page_one_file_fullname + "." + page_one_ext,
                                                          pdf_path + jpg_dict[0])
                     current_app.logger.info(str(result))
@@ -1207,7 +1207,7 @@ class COcr():
                     page_two_file_fullname = (pdf_path.replace("/tmp", "tmp") + jpg_dict[0]).split(".")[0]
                     page_two_ext = (pdf_path + jpg_dict[0]).split(".")[1]
 
-                    page_two_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + page_two_file_fullname + "-" + jpg_uuid + "." + page_two_ext
+                    page_two_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + page_two_file_fullname + "." + page_two_ext
                     result = bucket.put_object_from_file(page_two_file_fullname + "." + page_two_ext,
                                                          pdf_path + jpg_dict[0])
                     current_app.logger.info(str(result))
@@ -1215,7 +1215,7 @@ class COcr():
                     page_three_file_fullname = (pdf_path.replace("/tmp", "tmp") + jpg_dict[0]).split(".")[0]
                     page_three_ext = (pdf_path + jpg_dict[0]).split(".")[1]
 
-                    page_three_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + page_three_file_fullname + "-" + jpg_uuid + "." + page_three_ext
+                    page_three_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + page_three_file_fullname + "." + page_three_ext
                     result = bucket.put_object_from_file(page_three_file_fullname + "." + page_three_ext,
                                                          pdf_path + jpg_dict[0])
                     current_app.logger.info(str(result))
@@ -1223,7 +1223,7 @@ class COcr():
                     page_four_file_fullname = (pdf_path.replace("/tmp", "tmp") + jpg_dict[0]).split(".")[0]
                     page_four_ext = (pdf_path + jpg_dict[0]).split(".")[1]
 
-                    page_four_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + page_four_file_fullname + "-" + jpg_uuid + "." + page_four_ext
+                    page_four_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + page_four_file_fullname + "." + page_four_ext
                     result = bucket.put_object_from_file(page_four_file_fullname + "." + page_four_ext,
                                                          pdf_path + jpg_dict[0])
                     current_app.logger.info(str(result))
@@ -1236,7 +1236,7 @@ class COcr():
                     student_id = None
                     is_miss = "302"
 
-                    if response_one and response_one["status"] == "200":
+                    if response_one and response_one["status"] == 200:
                         result = response_one["data"]
                         result_list = result["dirct"]
                         for result_dict in result_list:
@@ -1253,7 +1253,8 @@ class COcr():
                                     auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
                                     bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
                                     file_fullname = pic_path.replace("/tmp", "tmp").split(".")[0]
-                                    ext = pic_path.split(".")[1]
+                                    current_app.logger.info(">>>>>>>>>>>>pic_path:" + str(pic_path))
+                                    ext = pic_path.split(".")[-1]
                                     jpg_uuid = str(uuid.uuid1())
 
                                     jpg_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + file_fullname + "-" + jpg_uuid + "." + ext
@@ -1269,7 +1270,7 @@ class COcr():
                                             "png_id": student_no_id,
                                             "png_url": jpg_url,
                                             "pdf_id": pdf.pdf_id,
-                                            "png_result": student_no,
+                                            "png_result": sn,
                                             "png_status": status,
                                             "png_type": "28",
                                             "question": None,
@@ -1313,7 +1314,7 @@ class COcr():
                                 auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
                                 bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
                                 file_fullname = pic_path.replace("/tmp", "tmp").split(".")[0]
-                                ext = pic_path.split(".")[1]
+                                ext = pic_path.split(".")[-1]
                                 jpg_uuid = str(uuid.uuid1())
 
                                 jpg_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + file_fullname + "-" + jpg_uuid + "." + ext
@@ -1373,16 +1374,18 @@ class COcr():
                                     "status": "4",
                                     "score": 0,
                                     "grade_time": datetime.now().date(),
+                                    "create_time": datetime.now().date(),
                                     "url": pdf.pdf_url,
                                     "upload_by": pdf.pdf_school,
                                     "grade_num": None,
-                                    "upload_id": pdf.upload_id
+                                    "upload_id": pdf.upload_id,
+                                    "is_miss": "301"
                                 }
                                 booklet_instance = j_answer_booklet.create(booklet_dict)
                                 db.session.add(booklet_instance)
 
                         else:
-                            if response_one and response_one["status"] == "200":
+                            if response_one and response_one["status"] == 200:
                                 result = response_one["data"]
                                 result_list = result["dirct"]
                                 for result_dict in result_list:
@@ -1391,10 +1394,10 @@ class COcr():
                                     auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
                                     bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
                                     file_fullname = pic_path.replace("/tmp", "tmp").split(".")[0]
-                                    ext = pic_path.split(".")[1]
+                                    ext = pic_path.split(".")[-1]
                                     jpg_uuid = str(uuid.uuid1())
 
-                                    jpg_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + file_fullname + "-" + jpg_uuid + "." + ext
+                                    jpg_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + file_fullname + "." + ext
                                     result = bucket.put_object_from_file(file_fullname + "." + ext,
                                                                          pic_path)
                                     current_app.logger.info(str(result))
@@ -1414,7 +1417,7 @@ class COcr():
                                 current_app.logger.info("第{0}页识别失败".format(str(jpg_index + 1)))
 
                             response_two = self._use_ocr(pdf_path + jpg_dict[1], page_two_dict)
-                            if response_two and response_two["status"] == "200":
+                            if response_two and response_two["status"] == 200:
                                 result = response_two["data"]
                                 result_list = result["dirct"]
                                 for result_dict in result_list:
@@ -1423,10 +1426,10 @@ class COcr():
                                     auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
                                     bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
                                     file_fullname = pic_path.replace("/tmp", "tmp").split(".")[0]
-                                    ext = pic_path.split(".")[1]
+                                    ext = pic_path.split(".")[-1]
                                     jpg_uuid = str(uuid.uuid1())
 
-                                    jpg_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + file_fullname + "-" + jpg_uuid + "." + ext
+                                    jpg_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + file_fullname + "." + ext
                                     result = bucket.put_object_from_file(file_fullname + "." + ext,
                                                                          pic_path)
                                     current_app.logger.info(str(result))
@@ -1446,7 +1449,7 @@ class COcr():
                                 current_app.logger.info("第{0}页识别失败".format(str(jpg_index + 2)))
 
                             response_three = self._use_ocr(pdf_path + jpg_dict[2], page_three_dict)
-                            if response_three and response_three["status"] == "200":
+                            if response_three and response_three["status"] == 200:
                                 result = response_three["data"]
                                 result_list = result["dirct"]
                                 for result_dict in result_list:
@@ -1455,10 +1458,10 @@ class COcr():
                                     auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
                                     bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
                                     file_fullname = pic_path.replace("/tmp", "tmp").split(".")[0]
-                                    ext = pic_path.split(".")[1]
+                                    ext = pic_path.split(".")[-1]
                                     jpg_uuid = str(uuid.uuid1())
 
-                                    jpg_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + file_fullname + "-" + jpg_uuid + "." + ext
+                                    jpg_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + file_fullname + "." + ext
                                     result = bucket.put_object_from_file(file_fullname + "." + ext,
                                                                          pic_path)
                                     current_app.logger.info(str(result))
@@ -1478,7 +1481,7 @@ class COcr():
                                 current_app.logger.info("第{0}页识别失败".format(str(jpg_index + 3)))
 
                             response_four = self._use_ocr(pdf_path + jpg_dict[3], page_four_dict)
-                            if response_four and response_four["status"] == "200":
+                            if response_four and response_four["status"] == 200:
                                 result = response_four["data"]
                                 result_list = result["dirct"]
                                 for result_dict in result_list:
@@ -1487,10 +1490,10 @@ class COcr():
                                     auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
                                     bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
                                     file_fullname = pic_path.replace("/tmp", "tmp").split(".")[0]
-                                    ext = pic_path.split(".")[1]
+                                    ext = pic_path.split(".")[-1]
                                     jpg_uuid = str(uuid.uuid1())
 
-                                    jpg_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + file_fullname + "-" + jpg_uuid + "." + ext
+                                    jpg_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + file_fullname + "." + ext
                                     result = bucket.put_object_from_file(file_fullname + "." + ext,
                                                                          pic_path)
                                     current_app.logger.info(str(result))
@@ -1511,13 +1514,17 @@ class COcr():
 
                             scores_error = j_score.query.filter(j_score.booklet_id == booklet_id,
                                                                 j_score.status.in_(["303", "302"])).all()
-                            if not scores_error:
-                                booklet_status = "4"
-                                scores_all = j_score.query.filter(j_score.booklet_id == booklet_id,
-                                                                j_score.status == "304").all()
-                                booklet_score = 0
-                                for scores in scores_all:
-                                    booklet_score += scores.score
+                            if pdf.pdf_use == "300201":
+                                if not scores_error:
+                                    booklet_status = "4"
+                                    scores_all = j_score.query.filter(j_score.booklet_id == booklet_id,
+                                                                    j_score.status == "304").all()
+                                    booklet_score = 0
+                                    for scores in scores_all:
+                                        booklet_score += scores.score
+                                else:
+                                    booklet_status = "3"
+                                    booklet_score = None
                             else:
                                 booklet_status = "1"
                                 booklet_score = None
@@ -1528,10 +1535,12 @@ class COcr():
                                 "status": booklet_status,
                                 "score": booklet_score,
                                 "grade_time": datetime.now().date(),
+                                "create_time": datetime.now().date(),
                                 "url": json.dumps([page_one_url, page_two_url, page_three_url, page_four_url]),
                                 "upload_by": pdf.pdf_school,
                                 "grade_num": None,
-                                "upload_id": pdf.upload_id
+                                "upload_id": pdf.upload_id,
+                                "is_miss": "302"
                             }
                             with db.auto_commit():
                                 booklet_instance = j_answer_booklet.create(booklet_dict)
@@ -1547,20 +1556,22 @@ class COcr():
                         "pdf_status": "300302"
                     })
                     db.session.add(pdf_instance)
+
                     pdf_error_status = j_answer_pdf.query.filter(j_answer_pdf.upload_id == upload_id,
                                                                  j_answer_pdf.pdf_status.in_(
-                                                                     ["300301", "300303", "300304"])).all()
+                                                                     ["300305", "300303", "300304"])).all()
                     if not pdf_error_status:
                         if pdf.pdf_use == "300201":
                             upload_status = "无需分配"
                         else:
                             upload_status = "1"
                     else:
+                        current_app.logger.info(">>>>>>>>>>>>>>>>>pdf_error_list:" + str(pdf_error_status))
                         upload_status = "解析失败"
                     upload = j_answer_upload.query.filter(j_answer_upload.id == upload_id).first()
                     upload_instance = upload.update({
                         "status": upload_status
-                    })
+                    }, null="not")
                     db.session.add(upload_instance)
 
                 shutil.rmtree(pdf_path)
@@ -1585,7 +1596,7 @@ class COcr():
                 dot_dict["cut_height"] = dot["height"]
                 dot_dict["cut_width"] = dot["width"]
                 dot_dict["type"] = "28"
-                dot_dict["img_use"] = "300203"
+                dot_dict["img_use"] = "300201"
                 dot_dict["result"] = None
                 dot_dict["result_status"] = None
                 dot_dict["img_path"] = None
@@ -1600,7 +1611,7 @@ class COcr():
                 dot_dict["cut_height"] = dot["height"]
                 dot_dict["cut_width"] = dot["width"]
                 dot_dict["type"] = "29"
-                dot_dict["img_use"] = "300203"
+                dot_dict["img_use"] = "300201"
                 dot_dict["result"] = None
                 dot_dict["result_status"] = None
                 dot_dict["img_path"] = None
@@ -1615,7 +1626,7 @@ class COcr():
                 dot_dict["cut_height"] = dot["height"]
                 dot_dict["cut_width"] = dot["width"]
                 dot_dict["type"] = "20"
-                dot_dict["img_use"] = "300203"
+                dot_dict["img_use"] = "300201"
                 dot_dict["result"] = None
                 dot_dict["result_status"] = None
                 dot_dict["img_path"] = None
@@ -1768,7 +1779,7 @@ class COcr():
                                       student_no_id, student_name, school_name, student_id):
         with db.auto_commit():
             score_id = str(uuid.uuid1())
-            if result_dict["ocr_result_status"] == "0":
+            if result_dict["ocr_result_status"] == "200":
                 status = 301
                 png_status = 304
             else:
@@ -1776,7 +1787,8 @@ class COcr():
                 png_status = 303
             question = j_question.query.filter(j_question.paper_id == paper.id,
                                                j_question.question_number == result_dict["index"]).first()
-            if result_dict["ocr_result"] in question.answer:
+            # TODO 清理标签
+            if result_dict["ocr_result"] in question.answerhtml:
                 score = question.score
             else:
                 score = 0
@@ -1787,7 +1799,7 @@ class COcr():
                 "png_id": str(uuid.uuid1()),
                 "png_url": jpg_url,
                 "pdf_id": pdf.pdf_id,
-                "png_result": student_no,
+                "png_result": result_dict["ocr_result"],
                 "png_status": status,
                 "png_type": result_dict["type"],
                 "question": question.content,
@@ -1822,7 +1834,7 @@ class COcr():
         if img_use == "300201":
             # 已批阅
             score_id = str(uuid.uuid1())
-            if result_dict["ocr_result_status"] == "0":
+            if result_dict["ocr_result_status"] == "200":
                 status = 301
                 png_status = 304
             else:
@@ -1830,10 +1842,13 @@ class COcr():
                 png_status = 303
             question = j_question.query.filter(j_question.paper_id == paper.id,
                                                j_question.question_number == result_dict["index"]).first()
-            if result_dict["ocr_result"] in question.answer:
-                score = question.score
+            # 超过分数
+            if question.score < int(result_dict["ocr_result"]) or result_dict["ocr_result_status"] != "200":
+                status = 303,
+                png_status = 303
+                score = None,
             else:
-                score = 0
+                score = int(result_dict["ocr_result"])
             png_dict = {
                 "isdelete": 0,
                 "createtime": datetime.now(),
@@ -1841,7 +1856,7 @@ class COcr():
                 "png_id": str(uuid.uuid1()),
                 "png_url": jpg_url,
                 "pdf_id": pdf.pdf_id,
-                "png_result": student_no,
+                "png_result": result_dict["ocr_result"],
                 "png_status": status,
                 "png_type": result_dict["type"],
                 "question": question.content,
@@ -1851,8 +1866,8 @@ class COcr():
                 "student_no_id": student_no_id,
                 "student_name": student_name,
                 "school": school_name,
-                "result_score": score,
-                "result_update": score,
+                "result_score": result_dict["ocr_result"],
+                "result_update": result_dict["ocr_result"],
                 "score_id": score_id
             }
             score_dict = {
@@ -1869,7 +1884,7 @@ class COcr():
         else:
             # 未批阅
             score_id = str(uuid.uuid1())
-            if result_dict["ocr_result_status"] == "0":
+            if result_dict["ocr_result_status"] == "200":
                 status = 304
                 png_status = 302
             else:
@@ -1877,10 +1892,6 @@ class COcr():
                 png_status = 303
             question = j_question.query.filter(j_question.paper_id == paper.id,
                                                j_question.question_number == result_dict["index"]).first()
-            if result_dict["ocr_result"] in question.answer:
-                score = question.score
-            else:
-                score = 0
             png_dict = {
                 "isdelete": 0,
                 "createtime": datetime.now(),
@@ -1888,7 +1899,7 @@ class COcr():
                 "png_id": str(uuid.uuid1()),
                 "png_url": jpg_url,
                 "pdf_id": pdf.pdf_id,
-                "png_result": student_no,
+                "png_result": result_dict["ocr_result"],
                 "png_status": status,
                 "png_type": "24",
                 "question": question.content,
@@ -1909,7 +1920,7 @@ class COcr():
                 "question_id": question.id,
                 "grade_by": "system-ocr",
                 "question_number": result_dict["index"],
-                "score": score,
+                "score": None,
                 "question_url": jpg_url,
                 "status": png_status
             }
@@ -1924,7 +1935,7 @@ class COcr():
         if img_use == "300201":
             # 已批阅
             score_id = str(uuid.uuid1())
-            if result_dict["ocr_result_status"] == "0":
+            if result_dict["ocr_result_status"] == "200":
                 status = 301
                 png_status = 304
             else:
@@ -1932,10 +1943,13 @@ class COcr():
                 png_status = 303
             question = j_question.query.filter(j_question.paper_id == paper.id,
                                                j_question.question_number == result_dict["index"]).first()
-            if result_dict["ocr_result"] in question.answer:
-                score = question.score
+            # 超过分数
+            if question.score < int(result_dict["ocr_result"]) or result_dict["ocr_result_status"] != "200":
+                status = 303,
+                png_status = 303
+                score = None,
             else:
-                score = 0
+                score = int(result_dict["ocr_result"])
             png_dict = {
                 "isdelete": 0,
                 "createtime": datetime.now(),
@@ -1943,7 +1957,7 @@ class COcr():
                 "png_id": str(uuid.uuid1()),
                 "png_url": jpg_url,
                 "pdf_id": pdf.pdf_id,
-                "png_result": student_no,
+                "png_result": result_dict["ocr_result"],
                 "png_status": status,
                 "png_type": result_dict["type"],
                 "question": question.content,
@@ -1953,10 +1967,11 @@ class COcr():
                 "student_no_id": student_no_id,
                 "student_name": student_name,
                 "school": school_name,
-                "result_score": score,
-                "result_update": score,
+                "result_score": result_dict["ocr_result"],
+                "result_update": result_dict["ocr_result"],
                 "score_id": score_id
             }
+
             score_dict = {
                 "id": score_id,
                 "student_id": student_id,
@@ -1971,7 +1986,7 @@ class COcr():
         else:
             # 未批阅
             score_id = str(uuid.uuid1())
-            if result_dict["ocr_result_status"] == "0":
+            if result_dict["ocr_result_status"] == "200":
                 status = 304
                 png_status = 302
             else:
@@ -1979,10 +1994,6 @@ class COcr():
                 png_status = 303
             question = j_question.query.filter(j_question.paper_id == paper.id,
                                                j_question.question_number == result_dict["index"]).first()
-            if result_dict["ocr_result"] in question.answer:
-                score = question.score
-            else:
-                score = 0
             png_dict = {
                 "isdelete": 0,
                 "createtime": datetime.now(),
@@ -1990,7 +2001,7 @@ class COcr():
                 "png_id": str(uuid.uuid1()),
                 "png_url": jpg_url,
                 "pdf_id": pdf.pdf_id,
-                "png_result": student_no,
+                "png_result": result_dict["ocr_result"],
                 "png_status": status,
                 "png_type": "26",
                 "question": question.content,
@@ -2011,7 +2022,7 @@ class COcr():
                 "question_id": question.id,
                 "grade_by": "system-ocr",
                 "question_number": result_dict["index"],
-                "score": score,
+                "score": None,
                 "question_url": jpg_url,
                 "status": png_status
             }
