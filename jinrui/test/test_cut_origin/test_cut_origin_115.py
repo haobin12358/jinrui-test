@@ -9,77 +9,109 @@ import os
 import cv2
 import time
 
-url = "https://jinrui.sanbinit.cn/api/ocr/get_pdf?pdf_status=300306"
+url = "https://jinrui.sanbinit.cn/api/ocr/get_pdf"
 
 
-def path_change_test(origin_path):
+def path_change_test(origin_path, local_path):
     """
     将网络图像路径转化为本地图像路径
     """
-    local_path = os.path.join(os.getcwd(),"origin")
     local_list = os.listdir(local_path)
 
     ext_name = os.path.basename(origin_path).split("-")[-1]
     for local_name in local_list:
         local_ext = local_name.split("-")[-1]
+        # if ext_name == "0001.png":
+        #     return os.path.join(local_path, local_name)
+        # else:
+        #     return ""
         if local_ext == ext_name:
             return os.path.join(local_path, local_name)
 
 
-def get_data():
+def get_data(local_path="", code=300306):
     """
     从接口获取原生json数据
     """
-    pdf_data = requests.get(url).json()
-    print(pdf_data)
-    return parse_data(pdf_data)
+    data = {'pdf_status': code}
+    pdf_data = requests.get(url, params=data).json()
+    return get_json_dict(pdf_data, local_path=local_path)
 
 
-def parse_data(pdf_data):
+def get_json_dict(pdf_data, local_path=""):
     """
-    从原生json数据进行解析
+    从接口数据解析出图像路径以及json_dict
     """
-    img_path = []  #图像路径
-    pts = []  #坐标，4位为cut,4位为ocr，1位为type,1位为use类型
+    if len(pdf_data) == 0:
+        return [], []
+    img_paths = []
+    json_dict = []
+    for pdf in pdf_data:
+        if len(local_path) == 0:
+            img_paths.append(pdf['jpg_path'])
+        else:
+            img_paths.append(path_change_test(pdf['jpg_path'], local_path))
+        json_dict.append(pdf['json_dict'])
+    return img_paths, json_dict
 
-    #   开始解析
-    for jpg_data in pdf_data:
-        img_path.append(path_change_test(jpg_data['jpg_path']))
 
-        ocr_dict = jpg_data['json_dict']['ocr_dict']
+def get_pts(json_dict):
+    """
+    从单个json_dict中提取需要的坐标信息
+    """
+    if len(json_dict) == 0:
+        return
+    ocr_dict = json_dict['ocr_dict']
+    height = json_dict['height']
+    width = json_dict['width']
 
-        height = jpg_data['json_dict']['height']
-        width = jpg_data['json_dict']['width']
+    pts = []
+    for ocr in ocr_dict:
+        cut_dot = ocr['cut_dot']
+        cut_height = ocr['cut_height']
+        cut_width = ocr['cut_width']
 
-        pdf_img_pts = []
-        for ocr in ocr_dict:
-            #   提取裁剪区域与识别区域，以及类型
-            cut_dot = ocr['cut_dot']
-            cut_height = ocr['cut_height']
-            cut_width = ocr['cut_width']
+        ocr_dot = ocr['ocr_dot']
+        ocr_height = ocr['ocr_height']
+        ocr_width = ocr['ocr_width']
 
-            ocr_dot = ocr['ocr_dot']
-            ocr_height = ocr['ocr_height']
-            ocr_width = ocr['ocr_width']
+        # None 错误检测
+        if cut_dot is None:
+            cut_dot = [0, 0]
+        if cut_height is None:
+            cut_height = 0
+        if cut_width is None:
+            cut_width = 0
 
-            ocr_type = float(ocr['type'])
+        if ocr_dot is None:
+            ocr_dot = [0, 0]
+        if ocr_height is None:
+            ocr_height = 0
+        if ocr_width is None:
+            ocr_width = 0
 
-            img_use = float(ocr['img_use'])
+        ocr_type = float(ocr['type'])
 
-            index = ocr['index']
-            if index is not None:
-                index = float(index)
+        img_use = float(ocr['img_use'])
+
+        index = ocr['index']
+        if index is not None:
+            index = float(index)
+        else:
+            if ocr_type == 20:
+                index = -2
+            elif ocr_type == 28:
+                index = -3
+            elif ocr_type == 29:
+                index = -4
             else:
                 index = -1
-
-            pdf_img_pts.append([
-                width, height, cut_dot[0], cut_dot[1], cut_width, cut_height,
-                ocr_dot[0], ocr_dot[1], ocr_width, ocr_height, ocr_type,
-                img_use, index
-            ])
-        pts.append(pdf_img_pts)
-
-    return img_path, pts
+        pts.append([
+            width, height, cut_dot[0], cut_dot[1], cut_width, cut_height,
+            ocr_dot[0], ocr_dot[1], ocr_width, ocr_height, ocr_type, img_use,
+            index
+        ])
+    return pts
 
 
 def find_pts(bin_img, flag):
@@ -97,11 +129,6 @@ def find_pts(bin_img, flag):
 
     index = 0
     x, y, w, h = cv2.boundingRect(contouts[index])
-
-    # print(len(contouts))
-    # for i in range(len(contouts)):
-    #     x, y, w, h = cv2.boundingRect(contouts[i])
-    #     print(x, y, w, h)
 
     if flag == 1:
         return [int(x), int(y)]
@@ -122,7 +149,7 @@ def compute_effect_area(img):
     height, width, stride = img.shape
     rate = 8
     area_img = float(width * height)
-    gray_min = 50
+    gray_min = 150
     gray_max = 255
     max_box = 0.9
     min_box = 0.001
@@ -178,7 +205,6 @@ def compute_effect_area(img):
     effect_area = [
         left_top_pts[0], left_top_pts[1], effect_area_width, effect_area_height
     ]
-    print(effect_area)
 
     return effect_area
 
@@ -266,7 +292,8 @@ def aligner_cut():
     """
     start_time = time.time()
 
-    img_paths, pts = get_data()
+    img_paths, json_dict = get_data(local_path="origin")
+    print(len(img_paths),len(json_dict))
     network_time = time.time()
 
     print('network get cost time = %fs' % (network_time - start_time))
@@ -277,8 +304,9 @@ def aligner_cut():
         if len(img_path) == 0:
             print(f"not exists img_path {img_path}")
             continue
-        draw_cut = draw_img(img_path, pts[i], 1)
-        draw_ocr = draw_img(img_path, pts[i], 2)
+        pts=get_pts(json_dict[i])
+        draw_cut = draw_img(img_path, pts, 1)
+        draw_ocr = draw_img(img_path, pts, 2)
         if draw_cut is None or draw_ocr is None:
             print("cut failed")
             continue

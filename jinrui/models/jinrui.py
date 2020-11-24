@@ -46,9 +46,11 @@ class j_question(Base):
     create_time = Column(DateTime)
     update_time = Column(DateTime)
     url = Column(Text)
+
     contenthtml = Column(LONGTEXT, comment='题干html')
     answerhtml = Column(LONGTEXT, comment='答案html')
     explanationhtml = Column(LONGTEXT, comment='答案html')
+
 
 class j_student(Base):
     """
@@ -86,6 +88,7 @@ class j_answer_booklet(Base):
     upload_by = Column(String(32), comment="上传人id")
     grade_num = Column(Integer, comment="已批阅数目")
     upload_id = Column(String(64), comment="答卷上传记录id")
+    is_miss = Column(String(10), comment="是否缺考301缺考302未缺考")
 
 class j_score(Base):
     """
