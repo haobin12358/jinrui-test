@@ -1557,6 +1557,7 @@ class COcr():
                     })
                     db.session.add(pdf_instance)
 
+                with db.auto_commit():
                     pdf_error_status = j_answer_pdf.query.filter(j_answer_pdf.upload_id == upload_id,
                                                                  j_answer_pdf.pdf_status.in_(
                                                                      ["300305", "300303", "300304"])).all()
@@ -1566,9 +1567,9 @@ class COcr():
                         else:
                             upload_status = "1"
                     else:
-                        current_app.logger.info(">>>>>>>>>>>>>>>>>pdf_error_list:" + str(pdf_error_status))
                         upload_status = "解析失败"
                     upload = j_answer_upload.query.filter(j_answer_upload.id == upload_id).first()
+                    current_app.logger.info(">>>>>>>>>>>>>>>>>upload_id:" + str(upload_id))
                     upload_instance = upload.update({
                         "status": upload_status
                     }, null="not")
@@ -1884,12 +1885,10 @@ class COcr():
         else:
             # 未批阅
             score_id = str(uuid.uuid1())
-            if result_dict["ocr_result_status"] == "200":
-                status = 304
-                png_status = 302
-            else:
-                status = 303
-                png_status = 303
+
+            status = 304
+            png_status = 302
+
             question = j_question.query.filter(j_question.paper_id == paper.id,
                                                j_question.question_number == result_dict["index"]).first()
             png_dict = {
@@ -1986,12 +1985,9 @@ class COcr():
         else:
             # 未批阅
             score_id = str(uuid.uuid1())
-            if result_dict["ocr_result_status"] == "200":
-                status = 304
-                png_status = 302
-            else:
-                status = 303
-                png_status = 303
+            status = 304
+            png_status = 302
+
             question = j_question.query.filter(j_question.paper_id == paper.id,
                                                j_question.question_number == result_dict["index"]).first()
             png_dict = {
