@@ -44,7 +44,7 @@ class CPdfUpload(object):
             sheet_dict = sheet_dict_model.json
         else:
             sheet_dict = ''
-        pdf_status = '300301'
+        pdf_status = '300305'
         filename = file.filename
         shuffix = os.path.splitext(filename)[-1]
         current_app.logger.info(">>>  Upload File Shuffix is {0}  <<<".format(shuffix))

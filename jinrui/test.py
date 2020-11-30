@@ -14,7 +14,7 @@ except Exception as e:
 # 第一个参数是一个可以返回时间戳的函数，第二个参数可以在定时未到达之前阻塞。
 import requests
 import logging
-
+print('sart first')
 schedule = sched.scheduler(time.time, time.sleep)
 
 
@@ -64,10 +64,10 @@ class ScanPdf(object):
             current_path = os.path.join(self.base_dir, pdf_use_dir)
             if not os.path.isdir(current_path):
                 continue
-            if pdf_use_dir == '0':
+            if pdf_use_dir == '已批阅':
                 pdf_use = "300201"
 
-            elif pdf_use_dir == '1':
+            elif pdf_use_dir == '未批阅':
                 pdf_use = '300202'
 
             else:
@@ -118,7 +118,7 @@ class ScanPdf(object):
                 self.log.info('文件上传成功 {}'.format(json_response.get('message')))
             if int(json_response.get('code', 0)) == 200:
                 self.log.error('文件上传失败 {}'.format(json_response.get('message')))
-
+            response.close()
         except Exception as e:
             self.log.error('文件上传失败 {}'.format(e))
         finally:
@@ -149,13 +149,14 @@ class ConfigSettings(object):
     def write_file(self):
         with open(self.config_file_path, "w") as cfg:
             self.cf.write(cfg)
-            print('file is closed')
 
 
 def main(inc=60):
     # enter四个参数分别为：间隔事件、优先级（用于同时间到达的两个事件同时执行时定序）、被调用触发的函数，
     # 给该触发函数的参数（tuple形式）
+    print('start')
     sp = ScanPdf()
+    print('init over ')
     schedule.enter(0, 0, sp.scan_dir, (inc,))
     schedule.run()
 
@@ -163,8 +164,8 @@ def main(inc=60):
 # sp = ScanPdf()
 # path = r'D:\teamsystem\jinrui-test\img\pdf\2020\10\30\DmU5LJ5GiH7oiWq4rGlL.pdf'
 # sp.upload_pdf('0', 'test', path, 'DmU5LJ5GiH7oiWq4rGlL.pdf')
-if __name__ == '__main__':
-    main()
+# if __name__ == '__main__':
+main()
 # local test
 # base_bath = os.getcwd()
 # cfg_path = os.path.join(base_bath, 'existfile.cfg')
