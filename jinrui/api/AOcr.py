@@ -14,7 +14,9 @@ class AOcr(Resource):
             "deal_pdf": self.cocr.deal_pdf,
             "get_pdf": self.cocr.get_pdf,
             "mock_booklet": self.cocr.mock_booklet,
-            "fix_ocr_bugs": self.cocr.fix_ocr_bugs
+            "fix_ocr_bugs": self.cocr.fix_ocr_bugs,
+            "get_pdf_dict": self.cocr.get_pdf_dict,
+            "download_pdf": self.cocr.download_pdf
         }
 
         return apis

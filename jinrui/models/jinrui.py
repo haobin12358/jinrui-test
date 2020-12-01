@@ -120,6 +120,9 @@ class j_answer_zip(Base):
     zip_url = Column(String(255), comment="zip地址", nullable=False)
     zip_upload_user = Column(String(255), comment="上传人", default="system")
     zip_status = Column(String(10), comment="300101未解析300102已解析300103解析失败")
+    zip_ip = Column(String(20), comment="上传ip")
+    zip_paper = Column(String(255), comment="zip对应的考卷")
+    zip_use = Column(String(10), nullable=False, comment="300201先批后扫300202先扫后批")
 
 class j_answer_pdf(Base):
     """
@@ -255,3 +258,20 @@ class j_school_network(Base):
     net_ip = Column(String(20), nullable=False, comment="固定网段")
     school_name = Column(String(255), nullable=False, comment="学校名称")
     school_position = Column(String(255), comment="设备备注")
+
+class test_pdf(Base):
+    """
+    算法测试用：
+    需要下载的pdf
+    """
+    __tablename__ = "test_pdf"
+    isdelete = Column(Boolean, default=False, comment='是否删除')
+    createtime = Column(DateTime, default=datetime.now, comment='创建时间')
+    updatetime = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')
+    test_id = Column(String(64), primary_key=True)
+    pdf_url = Column(String(255), comment="pdf的url")
+    pdf_path = Column(String(255), comment="pdf下载路径")
+    page_list = Column(Text, comment="前端的json")
+    test_status = Column(String(10), comment="300501待下载300502已下载")
+    test_use = Column(String(10), comment="pdf用途")
+    test_sheet = Column(Text, comment="需要返回的json")
