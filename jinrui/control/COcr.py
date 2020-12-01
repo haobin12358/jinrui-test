@@ -1204,7 +1204,7 @@ class COcr():
                                                          pdf_path + jpg_dict[0])
                     current_app.logger.info(str(result))
 
-                    page_two_file_fullname = (pdf_path.replace("/tmp", "tmp") + jpg_dict[0]).split(".")[0]
+                    page_two_file_fullname = (pdf_path.replace("/tmp", "tmp") + jpg_dict[1]).split(".")[0]
                     page_two_ext = (pdf_path + jpg_dict[0]).split(".")[1]
 
                     page_two_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + page_two_file_fullname + "." + page_two_ext
@@ -1212,7 +1212,7 @@ class COcr():
                                                          pdf_path + jpg_dict[0])
                     current_app.logger.info(str(result))
 
-                    page_three_file_fullname = (pdf_path.replace("/tmp", "tmp") + jpg_dict[0]).split(".")[0]
+                    page_three_file_fullname = (pdf_path.replace("/tmp", "tmp") + jpg_dict[2]).split(".")[0]
                     page_three_ext = (pdf_path + jpg_dict[0]).split(".")[1]
 
                     page_three_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + page_three_file_fullname + "." + page_three_ext
@@ -1220,7 +1220,7 @@ class COcr():
                                                          pdf_path + jpg_dict[0])
                     current_app.logger.info(str(result))
 
-                    page_four_file_fullname = (pdf_path.replace("/tmp", "tmp") + jpg_dict[0]).split(".")[0]
+                    page_four_file_fullname = (pdf_path.replace("/tmp", "tmp") + jpg_dict[3]).split(".")[0]
                     page_four_ext = (pdf_path + jpg_dict[0]).split(".")[1]
 
                     page_four_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + page_four_file_fullname + "." + page_four_ext
