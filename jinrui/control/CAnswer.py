@@ -28,12 +28,11 @@ class CAnswer():
         manager = j_manager.query.filter(j_manager.id == data.get("id")).first_("未找到该用户")
 
         pdf_ip = request.remote_addr
-        school_network = j_school_network.query.filter(j_school_network.net_ip == pdf_ip).first()
-        if school_network:
-            school_name = school_network.school_name
-        else:
-            school_name = None
 
+        if data.get("type") == "0":
+            zip_use = "300201"
+        else:
+            zip_use = "300202"
         zip_uuid = str(uuid.uuid1())
         # 将zip存储进表，防止解析失败或者趸机
         with db.auto_commit():
@@ -44,105 +43,143 @@ class CAnswer():
                 "zip_id": zip_uuid,
                 "zip_url": data.get("url"),
                 "zip_upload_user": manager.name,
-                "zip_status": "300101"
+                "zip_status": "300101",
+                "zip_ip": pdf_ip,
+                "zip_paper": data.get("paperId"),
+                "zip_use": zip_use
             }
             zip_instance = j_answer_zip.create(zip_dict)
             db.session.add(zip_instance)
-
-        # 创建zip存储路径
-        if platform.system() == "Windows":
-            zip_path = "D:\\jinrui_zip\\" + zip_uuid + "\\"
-        else:
-            zip_path = "/tmp/jinrui_zip/" + zip_uuid + "/"
-        if not os.path.exists(zip_path):
-            os.makedirs(zip_path)
-
-        auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
-        bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
-
-        zip_name = data.get("url").split("/")
-        zip_save_path = zip_path + zip_name[-1]
-        # 存储zip到本地
-        bucket.get_object_to_file(zip_name[-1], zip_save_path)
-
-        zip_file = zipfile.ZipFile(zip_save_path)
-        if os.path.isdir(zip_save_path + "_files"):
-            pass
-        else:
-            os.mkdir(zip_save_path + "_files")
-        for names in zip_file.namelist():
-            zip_file.extract(names, zip_save_path + "_files/")
-        zip_file.close()
-
-        paper = j_paper.query.filter(j_paper.name == data.get("paperId"), j_paper.type == "A").first_("未找到该试卷")
-        sheet_id = paper.sheet_id
-        sheet = j_answer_sheet.query.filter(j_answer_sheet.id == sheet_id).first_("未找到答题卡")
-        # 获取pdf文件列表
-        pdf_file = zip_save_path + "_files"
-        pdfs = os.listdir(pdf_file)
-        upload_id = str(uuid.uuid1())
-        with db.auto_commit():
-            # 遍历提交pdf到数据库
-            for pdf in pdfs:
-                if os.path.splitext(pdf)[1] == '.pdf':
-                    pdf_uuid = str(uuid.uuid1())
-                    pdf_path, pdf_fullname = os.path.split(pdf)
-                    pdf_name, pdf_ext = os.path.splitext(pdf_fullname)
-                    pdf_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" \
-                              + "pdf-" + pdf_uuid + "." + pdf_ext
-                    result = bucket.put_object_from_file("pdf-" + pdf_uuid + "." + pdf_ext,
-                                                         os.path.join(pdf_file, pdf))
-                    current_app.logger.info(">>>>>>>>>>>>result:" + str(result.status))
-
-                    if data.get("type") == "0":
-                        pdf_use = "300201"
-                    else:
-                        pdf_use = "300202"
-
-                    pdf_dict = {
-                        "isdelete": 0,
-                        "createtime": datetime.now(),
-                        "updatetime": datetime.now(),
-                        "pdf_id": pdf_uuid,
-                        "zip_id": zip_uuid,
-                        "pdf_use": pdf_use,
-                        "paper_name": data.get("paperId"),
-                        "sheet_dict": sheet.json,
-                        "pdf_status": "300305",
-                        "pdf_url": pdf_url,
-                        "pdf_address": "zip",
-                        "pdf_school": school_name,
-                        "pdf_ip": request.remote_addr,
-                        "upload_id": upload_id
-                    }
-
-                    pdf_instance = j_answer_pdf.create(pdf_dict)
-                    db.session.add(pdf_instance)
-
-            zip_file = j_answer_zip.query.filter(j_answer_zip.zip_id == zip_uuid).first()
-            zip_instance = zip_file.update({
-                "zip_status": "300102"
-            }, null="not")
-            db.session.add(zip_instance)
-
-            upload_dict = {
-                "is_delete": 0,
-                "create_time": datetime.now(),
-                "update_time": datetime.now(),
-                "id": upload_id,
-                "upload_by": manager.name,
-                "status": "处理中",
-                "url": data.get("url")
-            }
-            upload_instance = j_answer_upload.create(upload_dict)
-            db.session.add(upload_instance)
-
-        shutil.rmtree(zip_path)
         return {
             "code": 200,
             "success": True,
             "message": "上传成功"
         }
+
+    def deal_zip(self):
+        zip_dict = j_answer_zip.query.filter(j_answer_zip.isdelete == 0, j_answer_zip.zip_status == "300101")\
+            .order_by(j_answer_zip.createtime.desc()).first()
+        if zip_dict:
+            zip_uuid = zip_dict.zip_id
+            # 创建zip存储路径
+            if platform.system() == "Windows":
+                zip_path = "D:\\jinrui_zip\\" + zip_uuid + "\\"
+            else:
+                zip_path = "/tmp/jinrui_zip/" + zip_uuid + "/"
+            if not os.path.exists(zip_path):
+                os.makedirs(zip_path)
+
+            auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
+            bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
+
+            zip_name = zip_dict.zip_url.split("/")
+            zip_save_path = zip_path + zip_name[-1]
+            # 存储zip到本地
+            bucket.get_object_to_file(zip_name[-1], zip_save_path)
+
+            zip_file = zipfile.ZipFile(zip_save_path)
+            if os.path.isdir(zip_save_path + "_files"):
+                pass
+            else:
+                os.mkdir(zip_save_path + "_files")
+            for names in zip_file.namelist():
+                zip_file.extract(names, zip_save_path + "_files/")
+            zip_file.close()
+
+            paper = j_paper.query.filter(zip_dict.zip_paper, j_paper.type == "A").first_("未找到该试卷")
+            sheet_id = paper.sheet_id
+            sheet = j_answer_sheet.query.filter(j_answer_sheet.id == sheet_id).first_("未找到答题卡")
+            # 获取pdf文件列表
+            pdf_file = zip_save_path + "_files"
+            pdfs = os.listdir(pdf_file)
+            upload_id = str(uuid.uuid1())
+
+            school_network = j_school_network.query.filter(j_school_network.net_ip == zip_dict.zip_ip).first()
+            if school_network:
+                school_name = school_network.school_name
+            else:
+                school_name = None
+
+            with db.auto_commit():
+                # 遍历提交pdf到数据库
+                for pdf in pdfs:
+                    if os.path.splitext(pdf)[1] == '.pdf':
+                        pdf_uuid = str(uuid.uuid1())
+                        pdf_path, pdf_fullname = os.path.split(pdf)
+                        pdf_name, pdf_ext = os.path.splitext(pdf_fullname)
+                        pdf_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" \
+                                  + "pdf-" + pdf_uuid + "." + pdf_ext
+                        result = bucket.put_object_from_file("pdf-" + pdf_uuid + "." + pdf_ext,
+                                                             os.path.join(pdf_file, pdf))
+                        current_app.logger.info(">>>>>>>>>>>>result:" + str(result.status))
+
+                        pdf_use = zip_dict.zip_use
+
+                        pdf_dict = {
+                            "isdelete": 0,
+                            "createtime": datetime.now(),
+                            "updatetime": datetime.now(),
+                            "pdf_id": pdf_uuid,
+                            "zip_id": zip_uuid,
+                            "pdf_use": pdf_use,
+                            "paper_name": zip_dict.zip_paper,
+                            "sheet_dict": sheet.json,
+                            "pdf_status": "300305",
+                            "pdf_url": pdf_url,
+                            "pdf_address": "zip",
+                            "pdf_school": school_name,
+                            "pdf_ip": zip_dict.zip_ip,
+                            "upload_id": upload_id
+                        }
+
+                        pdf_instance = j_answer_pdf.create(pdf_dict)
+                        db.session.add(pdf_instance)
+                    else:
+                        # 将zip状态改为非法
+                        zip_file = j_answer_zip.query.filter(j_answer_zip.zip_id == zip_uuid).first()
+                        zip_instance = zip_file.update({
+                            "zip_status": "300104"
+                        }, null="not")
+                        db.session.add(zip_instance)
+                        # TODO 将ip拉入黑名单
+
+                        # 删除oss上的zip
+                        auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
+                        bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
+                        result = bucket.delete_object(zip_name[-1])
+                        current_app.logger.info(">>>>>>>>>>>>>>>>>>>>>>delete_oss:" + str(result.status))
+                        current_app.logger.info(">>>>>>>>>>>>>>>>>>>>>>delete_zip_name:" + str(zip_name[-1]))
+
+                        raise Exception("存在非法zip,已将ip：{0}拉入黑名单")
+
+                zip_file = j_answer_zip.query.filter(j_answer_zip.zip_id == zip_uuid).first()
+                zip_instance = zip_file.update({
+                    "zip_status": "300102"
+                }, null="not")
+                db.session.add(zip_instance)
+
+                upload_dict = {
+                    "is_delete": 0,
+                    "create_time": datetime.now(),
+                    "update_time": datetime.now(),
+                    "id": upload_id,
+                    "upload_by": zip_dict.zip_upload_user,
+                    "status": "处理中",
+                    "url": zip_dict.zip_url
+                }
+                upload_instance = j_answer_upload.create(upload_dict)
+                db.session.add(upload_instance)
+
+            # 删除oss上的zip
+            auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
+            bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
+            result = bucket.delete_object(zip_name[-1])
+            current_app.logger.info(">>>>>>>>>>>>>>>>>>>>>>delete_oss:" + str(result.status))
+            current_app.logger.info(">>>>>>>>>>>>>>>>>>>>>>delete_zip_name:" + str(zip_name[-1]))
+
+            shutil.rmtree(zip_path)
+        else:
+            current_app.logger.info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>get_zip:0")
 
     def get_answer_list(self):
 
