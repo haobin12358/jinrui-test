@@ -60,15 +60,15 @@ class CPdfUpload(object):
         newPath = os.path.join(current_app.config['BASEDIR'], 'img', 'pdf', year, month, day)
         if not os.path.isdir(newPath):
             os.makedirs(newPath)
-        newFile = os.path.join(newPath, img_name)
+        # newFile = os.path.join(newPath, img_name)
         # 服务器本地保存
-        file.save(newFile)
-        data = '/img/{folder}/{year}/{month}/{day}/{img_name}'.format(
-            folder='pdf', year=year,month=month, day=day, img_name=img_name)
+        # file.save(newFile)
+        objname = '/img/{folder}/{year}/{month}/{day}/{img_name}'.format(
+            folder='pdf', year=year, month=month, day=day, img_name=img_name)
         # 上传oss
-        self._upload_to_oss(newFile, data[1:], 'pdf')
+        self._upload_to_oss(objname[1:], file, 'pdf')
         oss_area = 'https://{}.{}'.format(ALIOSS_BUCKET_NAME, ALIOSS_ENDPOINT)
-        pdf_url = oss_area + data
+        pdf_url = oss_area + objname
         existupload = j_answer_pdf.query.filter(
             j_answer_pdf.isdelete == false(),
             j_answer_pdf.pdf_ip == pdf_ip,
@@ -123,8 +123,8 @@ class CPdfUpload(object):
 
         if current_app.config.get('IMG_TO_OSS'):
             try:
-                ali_oss.save(data=file_data, filename=data)
-                current_app.logger.info('上传oss 成功 path = {}'.format(data))
+                ali_oss.bytesave(data=file_data, bytescontent=data)
+                current_app.logger.info('上传oss 成功 path = {}'.format(file_data))
             except Exception as e:
                 current_app.logger.error(">>> {} 上传到OSS出错 : {}  <<<".format(msg, e))
                 raise Exception('服务器繁忙，请稍后再试')

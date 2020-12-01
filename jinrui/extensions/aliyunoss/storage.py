@@ -27,3 +27,7 @@ class AliyunOss(object):
     def delete(self, filename=None):
         if filename is not None:
             self.bucket.delete_object(filename)
+
+    def bytesave(self, data, bytescontent=None):
+        if bytescontent is not None:  # 文件大小不能超过5G
+            self.bucket.put_object(data, bytescontent)
