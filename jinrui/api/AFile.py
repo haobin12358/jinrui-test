@@ -12,3 +12,11 @@ class AFile(Resource):
         }
 
         return apis
+
+    def get(self, file):
+        apis = {
+            "get_oss_secret": self.cfile.get_oss_secret,
+            "get_token": self.cfile.get_token
+        }
+
+        return apis

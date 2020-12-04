@@ -129,7 +129,8 @@ class CPaper():
                         "score_height": 4,
                         "score_width": 9,
                         "score_dot": [688.38, 271.95],
-                        "show_title": 1
+                        "show_title": 1,
+                        "parts": "1"
                     }
                     response.append(select_dict)
                 else:
@@ -187,8 +188,6 @@ class CPaper():
 
             last_question_type = self._get_question_en(question.type)
 
-            print(question.type)
-            print(response)
         if last_question_type in ["select", "multi", "judge"]:
             response.append(select_dict)
 

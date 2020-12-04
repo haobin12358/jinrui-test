@@ -274,4 +274,4 @@ class test_pdf(Base):
     page_list = Column(Text, comment="前端的json")
     test_status = Column(String(10), comment="300501待下载300502已下载")
     test_use = Column(String(10), comment="pdf用途")
-    test_sheet = Column(Text, comment="需要返回的json")
+    test_sheet = Column(LONGTEXT, comment="需要返回的json")

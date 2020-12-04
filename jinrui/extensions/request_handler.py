@@ -10,18 +10,14 @@ from .success_response import Success
 
 
 def token_to_user_(token):
-    user = None
+    id = None
+    time = None
     if token:
         s = Serializer(current_app.config['SECRET_KEY'])
         try:
             data = s.loads(token)
             id = data['id']
-            model = data['model']
-            level = data['level']
-            username = data.get('username', 'none')
-            User = namedtuple('User', ('id', 'model', 'level', 'username'))
-            user = User(id, model, level, username)
-            setattr(request, 'user', user)
+            time = data['time']
             current_app.logger.info('current_user info : {}'.format(data))
         except BadSignature as e:
             pass
@@ -30,7 +26,10 @@ def token_to_user_(token):
         except Exception as e:
             current_app.logger.info(e)
     current_app.logger.info(request.detail)
-    return user
+    return {
+        "id": id,
+        "time": time
+    }
 
 
 def _get_user_agent():

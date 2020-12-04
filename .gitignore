@@ -131,3 +131,4 @@ dmypy.json
 .idea/
 jinrui/config/secret.py
 jinrui/config/http_config.py
+jinrui/test/mock_pdf/testsecret.py
