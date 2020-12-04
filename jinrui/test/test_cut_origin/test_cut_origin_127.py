@@ -9,7 +9,7 @@ import os
 import cv2
 import time
 
-url = "https://jinrui.sanbinit.cn/api/ocr/get_pdf_dict?test_id=08de4476-3550-11eb-95c9-fa163e8df331"
+url = "https://jinrui.sanbinit.cn/api/ocr/get_pdf_dict"
 
 
 def path_change_test(origin_path, local_path):
@@ -29,12 +29,14 @@ def path_change_test(origin_path, local_path):
             return os.path.join(local_path, local_name)
 
 
-def get_data(local_path="", code=300306):
+def get_data(local_path="", code=300306, test_id=""):
     """
     从接口获取原生json数据
     """
-    data = {'pdf_status': code}
+    #data = {'pdf_status': code}
+    data = {'test_id': test_id}
     pdf_data = requests.get(url, params=data).json()
+    print(pdf_data)
     return get_json_dict(pdf_data, local_path=local_path)
 
 
@@ -46,6 +48,7 @@ def get_json_dict(pdf_data, local_path=""):
         return [], []
     img_paths = []
     json_dict = []
+    pdf_data = pdf_data['data']
     for pdf in pdf_data:
         if len(local_path) == 0:
             img_paths.append(pdf['jpg_path'])
@@ -112,7 +115,6 @@ def get_pts(json_dict):
             index
         ])
     return pts
-
 
 def find_pts(bin_img, flag):
     """
@@ -286,13 +288,13 @@ def save_img(img, origin_path, flag):
         cv2.imwrite(save_path, img)
 
 
-def aligner_cut():
+def aligner_cut(test_id):
     """
     功能：总入口
     """
     start_time = time.time()
 
-    img_paths, json_dict = get_data(local_path="origin")
+    img_paths, json_dict = get_data(local_path="origin",test_id=test_id)
     print(len(img_paths),len(json_dict))
     network_time = time.time()
 
@@ -315,4 +317,10 @@ def aligner_cut():
 
 
 if __name__ == "__main__":
-    aligner_cut()
+    import sys
+    if len(sys.argv)<2:
+        print("Please Usage: <test_id> \n")
+        exit()
+    else:
+        test_id=str(sys.argv[1])
+        aligner_cut(test_id)

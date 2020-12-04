@@ -1,15 +1,32 @@
-import matplotlib.pyplot as plt
+# -*- coding: utf-8 -*-
 
-def formula2img(str_latex, out_file, img_size=(5,3), font_size=16):
-    fig = plt.figure(figsize=img_size)
-    ax = fig.add_axes([0, 0, 1, 1])
-    ax.get_xaxis().set_visible(False)
-    ax.get_yaxis().set_visible(False)
-    ax.set_xticks([])
-    ax.set_yticks([])
-    plt.text(0.5, 0.5, str_latex, fontsize=font_size, verticalalignment='center', horizontalalignment='center')
-    plt.savefig(out_file)
+from aliyunsdkcore import client
+from aliyunsdksts.request.v20150401 import AssumeRoleRequest
+import json, uuid, requests, datetime
+import oss2
 
-if __name__ == '__main__':
-    str_latex = r"$\{3x+5y+z \begin{aligned} 7x-2y+4z\ -6x+3y+2z$"
-    formula2img(str_latex, r'd:\f1.png', img_size=(18,12), font_size=64)
+# Endpoint以杭州为例，其它Region请按实际情况填写。
+endpoint = 'oss-cn-shanghai.aliyuncs.com'
+bucket_name = 'jinrui-sheet'
+
+response = requests.get("https://jinrui.sanbinit.cn/api/file/get_token")
+content = json.loads(response.content)
+print(content)
+token = content["data"]
+
+# 使用临时token中的认证信息初始化StsAuth实例。
+auth = oss2.StsAuth(token['Credentials']['AccessKeyId'],
+                    token['Credentials']['AccessKeySecret'],
+                    token['Credentials']['SecurityToken'])
+
+# 使用StsAuth实例初始化存储空间。
+bucket = oss2.Bucket(auth, endpoint, bucket_name)
+
+zip_uuid = str(uuid.uuid1())
+object_name = "zip-" + zip_uuid + ".zip"
+# 下载object。
+print(datetime.datetime.now())
+read_obj = bucket.put_object_from_file(object_name, "D:\\test3.zip")
+print(datetime.datetime.now())
+print("https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com/zip-" + zip_uuid + ".zip")
+print(read_obj.status)

@@ -1724,7 +1724,7 @@ class COcr():
                     dot_dict["ocr_dot"] = dot["score_dot"]
                     dot_dict["cut_dot"] = dot["dot"]
                     dot_dict["ocr_height"] = dot["score_height"]
-                    dot_dict["cut_height"] = dot["every_height"]
+                    dot_dict["cut_height"] = dot["height"]
                     dot_dict["index"] = "{0}".format(str(dot["start"]))
                     dot_dict["ocr_width"] = dot["score_width"]
                     dot_dict["cut_width"] = dot["every_width"]
@@ -1739,7 +1739,7 @@ class COcr():
                     dot_dict["ocr_dot"] = None
                     dot_dict["cut_dot"] = dot["dot"]
                     dot_dict["ocr_height"] = None
-                    dot_dict["cut_height"] = dot["every_height"]
+                    dot_dict["cut_height"] = dot["height"]
                     dot_dict["index"] = "{0}".format(str(dot["start"]))
                     dot_dict["ocr_width"] = None
                     dot_dict["cut_width"] = dot["every_width"]
@@ -1920,7 +1920,7 @@ class COcr():
                     dot_dict["ocr_dot"] = dot["score_dot"]
                     dot_dict["cut_dot"] = dot["dot"]
                     dot_dict["ocr_height"] = dot["score_height"]
-                    dot_dict["cut_height"] = dot["every_height"]
+                    dot_dict["cut_height"] = dot["height"]
                     dot_dict["index"] = "{0}".format(str(dot["start"]))
                     dot_dict["ocr_width"] = dot["score_width"]
                     dot_dict["cut_width"] = dot["every_width"]
@@ -1935,7 +1935,7 @@ class COcr():
                     dot_dict["ocr_dot"] = None
                     dot_dict["cut_dot"] = dot["dot"]
                     dot_dict["ocr_height"] = None
-                    dot_dict["cut_height"] = dot["every_height"]
+                    dot_dict["cut_height"] = dot["height"]
                     dot_dict["index"] = "{0}".format(str(dot["start"]))
                     dot_dict["ocr_width"] = None
                     dot_dict["cut_width"] = dot["every_width"]
@@ -2399,32 +2399,7 @@ class COcr():
                 }
 
     def mock_pdf(self):
-        # data = parameter_required(("file", "paper_name", "pdf_use"))
-        from flask import request
-        file = request.files.get("file")
-        data = request.form
-        if not file:
-            return {
-                "code": 405,
-                "success": False,
-                "message": "未发现文件"
-            }
-        filename = file.filename
-        etx = os.path.splitext(filename)[-1]
-        # 阿里云oss参数
-        auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
-        bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
-
-        file_uuid = str(uuid.uuid1())
-        file_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + "file-" + file_uuid + etx
-        result = bucket.put_object("file-" + file_uuid + etx, file)
-        if result.status != 200:
-            return {
-                "code": 405,
-                "success": False,
-                "message": "阿里云oss错误"
-            }
-        current_app.logger.info(">>>>>>>>>>>>>>>>>>>oss_status:" + str(result))
+        data = parameter_required(("file", "paper_name", "pdf_use"))
 
         paper = j_paper.query.filter(j_paper.name == data.get("paper_name")).first_("未找到试卷")
         sheet_id = paper.sheet_id
@@ -2444,7 +2419,7 @@ class COcr():
             "paper_name": data.get("paper_name"),
             "sheet_dict": sheet.json,
             "pdf_status": "300306",
-            "pdf_url": file_url,
+            "pdf_url": data.get("file"),
             "pdf_address": "zip",
             "pdf_school": "杭州崇德培训学校",
             "pdf_ip": "115.198.170.61",
@@ -2471,4 +2446,30 @@ class COcr():
         return {
             "status": 200,
             "message": "清理数据成功"
+        }
+
+    def set_network(self):
+        from flask import request
+        net_ip = request.remote_addr
+        args = parameter_required(("school_name", ))
+        net_dict = j_school_network.query.filter(j_school_network.net_ip == net_ip,
+                                                 j_school_network.school_name == args.get("school_name")).first()
+        if net_dict:
+            return {
+                "status": 405,
+                "message": "该ip已备案"
+            }
+        with db.auto_commit():
+            net_instance = j_school_network.create({
+                "isdelete": 0,
+                "createtime": datetime.now(),
+                "updatetime": datetime.now(),
+                "net_id": str(uuid.uuid1()),
+                "net_ip": net_ip,
+                "school_name": args.get("school_name")
+            })
+            db.session.add(net_instance)
+        return {
+            "status": 200,
+            "message": "备案成功"
         }
