@@ -41,6 +41,22 @@ def ocr_fix():
     except:
         current_app.logger.info(">>>>>>>>>>>>>>异常的ocr任务")
 
+@celery.task(name="deal_zip")
+def deal_zip():
+    try:
+        from jinrui.control.CAnswer import CAnswer
+        canswer = CAnswer().deal_zip()
+    except:
+        current_app.logger.info(">>>>>>>>>>>>处理zip失败")
+
+@celery.task(name="download_pdf")
+def download_pdf():
+    try:
+        from jinrui.control.COcr import COcr
+        cocr = COcr().download_pdf()
+    except:
+        current_app.logger.info(">>>>>>>>>>>下载pdf失败")
+
 
 @celery.task(name='auto_setpic')
 def auto_setpic():
