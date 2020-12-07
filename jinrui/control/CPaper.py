@@ -24,7 +24,7 @@ class CPaper():
                     and last_question_type != "" \
                     and last_question_type in ["select", "multi", "judge"]:
                 response.append(select_dict)
-            if question.type == "选择题":
+            if question.type in ["选择题", "听力", "完形填空", "阅读理解", "任务型阅读"]:
                 now_question_type = self._get_question_en(question.type)
                 if now_question_type != last_question_type:
                     select_dict = {
@@ -107,7 +107,7 @@ class CPaper():
                 else:
                     select_dict["num"] = select_dict["num"] + 1
 
-            elif question.type in ["填空题", "实验探究题"]:
+            elif question.type in ["填空题", "实验探究题", "词汇应用", "语法填空"]:
                 now_question_type = self._get_question_en(question.type)
                 if question.type != last_question_type_ch:
                     big_question_number = big_question_number + 1
@@ -160,7 +160,7 @@ class CPaper():
                     }
                     response.append(select_dict)
 
-            elif question.type in ["解答题", "计算题"]:
+            elif question.type in ["解答题", "计算题", "书面表达"]:
                 now_question_type = self._get_question_en(question.type)
                 if question.type != last_question_type_ch:
                     big_question_number = big_question_number + 1
@@ -206,7 +206,9 @@ class CPaper():
         }
 
     def _get_question_en(self, cn_question):
-        en_question_dict = ["select", "multi", "judge", "fill", "answer", "answer", "fill"]
-        ch_question_dict = ["选择题", "多选题", "判断题", "填空题", "解答题", "计算题", "实验探究题"]
+        en_question_dict = ["select", "multi", "judge", "fill", "answer", "answer", "fill", "select", "select", "select",
+                            "select", "fill", "fill", "answer"]
+        ch_question_dict = ["选择题", "多选题", "判断题", "填空题", "解答题", "计算题", "实验探究题", "听力", "完形填空",
+                            "阅读理解", "任务型阅读", "词汇运用", "语法填空", "书面表达"]
         index = ch_question_dict.index(cn_question)
         return en_question_dict[index]
