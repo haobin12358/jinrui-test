@@ -83,8 +83,29 @@ class CPpt():
             question_answer_dict = {}
             ppt_question_answer = j_question.query.filter(j_question.question_number == str(question_number),
                                                           j_question.paper_id == paper_id).first_("未找到题目")
-            question_answer_dict["question"] = ppt_question_answer.content
-            question_answer_dict["answer"] = ppt_question_answer.answer
+            import re
+            q_use_html = ppt_question_answer.contenthtml
+            q_img_list = re.findall(r"<img.*?/>", ppt_question_answer.contenthtml)
+            i = 0
+            q_img_src_list = []
+            for img in q_img_list:
+                q_use_html = ppt_question_answer.contenthtml.replace(img, "{0" + "[0]".format(i) + "}")
+                img_url = re.findall(r'.+?src="(\S+)"', img)[0]
+                q_img_src_list.append("<img src='{0}'></img>".format(img_url))
+                i += 1
+            q_text = re.sub(r"</?(.+?)>", "", q_use_html)
+            question_answer_dict["question"] = q_text.format(q_img_src_list)
+            a_use_html = ppt_question_answer.answerhtml
+            a_img_list = re.findall(r"<img.*?/>", ppt_question_answer.answerhtml)
+            i = 0
+            a_img_src_list = []
+            for img in a_img_list:
+                a_use_html = ppt_question_answer.answerhtml.replace(img, "{0" + "[0]".format(i) + "}")
+                img_url = re.findall(r'.+?src="(\S+)"', img)[0]
+                a_img_src_list.append("<img src='{0}'></img>".format(img_url))
+                i += 1
+            a_text = re.sub(r"</?(.+?)>", "", a_use_html)
+            question_answer_dict["answer"] = a_text.format(a_img_src_list)
             question_answer_dict["knowledge"] = ppt_question_answer.knowledge
             question_answer_list.append(question_answer_dict)
         current_app.logger.info(">>>>>>>>>>>>>>>>>>>question_answer_list:" + str(question_answer_list))
@@ -116,10 +137,11 @@ class CPpt():
 
             # 设置顶点尺寸
             left = top = Inches(0.5)
-            question_dict = question_answer["question"].split("<div>")
-            for question_item in question_dict:
+            question_dict = question_answer["question"]
+            print(question_dict)
+            for question_item in [question_dict]:
                 if question_item:
-                    question_item = question_item.replace("</div>", "#####").replace("<img src=\"", "#####").replace(
+                    question_item = question_item.replace("<img src=\"", "#####").replace(
                         "></img>", "#####").replace("<img src='", "#####")
                     question_item_dict = question_item.split("#####")
                     width = Inches(1)
@@ -194,12 +216,12 @@ class CPpt():
             txBox = slide.shapes.add_textbox(left, top, Inches(1), Inches(0.4))
             tf = txBox.text_frame
             tf.text = knowledge
-            answer_dict = question_answer["answer"].split("<div>")
+            answer_dict = question_answer["answer"]
             # 考虑考点高度值，增加答案起始高度
             top = Inches(1)
-            for answer_item in answer_dict:
+            for answer_item in [answer_dict]:
                 if answer_item:
-                    answer_item = answer_item.replace("</div>", "#####").replace("<img src='", "#####").replace(
+                    answer_item = answer_item.replace("<img src='", "#####").replace(
                         "></img>", "#####")
                     question_item_dict = answer_item.split("#####")
                     width = Inches(1)
