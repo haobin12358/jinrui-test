@@ -11,3 +11,9 @@ class APdfUpload(Resource):
             'upload_pdf': self.cp.upload_pdf
         }
         return api
+
+    def get(self, pdf):
+        api = {
+            'get_pdf_list': self.cp.get_pdf_list
+        }
+        return api
