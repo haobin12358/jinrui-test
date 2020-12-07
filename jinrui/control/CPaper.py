@@ -20,13 +20,13 @@ class CPaper():
         last_question_type = ""
         last_question_type_ch = ""
         for question in question_list:
-            if last_question_type != self._get_question_en(question.type) \
+            if last_question_type_ch != question.type \
                     and last_question_type != "" \
                     and last_question_type in ["select", "multi", "judge"]:
                 response.append(select_dict)
             if question.type in ["选择题", "听力", "完形填空", "阅读理解", "任务型阅读"]:
                 now_question_type = self._get_question_en(question.type)
-                if now_question_type != last_question_type:
+                if question.type != last_question_type_ch:
                     select_dict = {
                         "type": self._get_question_en(question.type),
                         "name": "",
@@ -107,7 +107,7 @@ class CPaper():
                 else:
                     select_dict["num"] = select_dict["num"] + 1
 
-            elif question.type in ["填空题", "实验探究题", "词汇应用", "语法填空"]:
+            elif question.type in ["填空题", "实验探究题", "词汇运用", "语法填空"]:
                 now_question_type = self._get_question_en(question.type)
                 if question.type != last_question_type_ch:
                     big_question_number = big_question_number + 1
