@@ -4,6 +4,9 @@ import os
 import platform
 import time
 import sched
+from datetime import datetime
+
+import oss2
 import requests
 import logging
 
@@ -15,10 +18,15 @@ except Exception as e:
 
 schedule = sched.scheduler(time.time, time.sleep)
 
+endpoint = 'oss-cn-shanghai.aliyuncs.com'
+bucket_name = 'jinrui-sheet'
+
 
 class ScanPdf(object):
     def __init__(self):
         self.url = 'https://jinrui.sanbinit.cn/api/pdf/upload_pdf'
+        self.check = 'https://jinrui.sanbinit.cn/api/pdf/get_pdf_list'
+        self.token = 'https://jinrui.sanbinit.cn/api/file/get_token'
         if platform.system() == "Windows":
             self.base_dir = r"C:\jinrui_tech\\"
         else:
@@ -88,17 +96,30 @@ class ScanPdf(object):
             self.upload_pdf(pdf_use, paper_name, current_path, pdf)
 
     def upload_pdf(self, pdf_use, paper_name, path, pdfname):
-
-        files = {
-            "file": (pdfname, open(path, "rb"), "application/pdf")
-        }
+        if self.check_pdf(pdf_use, path):
+            self.log.error('文件已上传')
+            return
+        time_now = datetime.now()
+        year = str(time_now.year)
+        month = str(time_now.month)
+        day = str(time_now.day)
+        objname = '/img/{folder}/{year}/{month}/{day}/{img_name}'.format(
+            folder='pdf', year=year, month=month, day=day, img_name=pdfname)
+        if not self.upload_file(objname[1:], path):
+            return
+        # files = {
+        #     "file": (pdfname, open(path, "rb"), "application/pdf")
+        # }
+        oss_area = 'https://{}.{}'.format(bucket_name, endpoint)
+        pdf_url = oss_area + objname
         data = {
             'pdfuse': pdf_use,
             'pdfaddress': path,
+            'pdfurl': pdf_url,
             'pagername': paper_name,
         }
         try:
-            response = requests.post(self.url, files=files, params=data)
+            response = requests.post(self.url, params=data)
             json_response = json.loads(response.content)
             if int(json_response.get('status', 0)) == 200:
                 self.log.info('文件上传成功 {}'.format(json_response.get('message')))
@@ -114,6 +135,49 @@ class ScanPdf(object):
                 # 全局变量添加文件名
                 self.filenamelist.append(path)
             self.log.info('文件上传完成')
+
+    def check_pdf(self, pdfuse, pdfaddress):
+        data = {
+            "pdfuse": pdfuse,
+            "pdfaddress": pdfaddress,
+        }
+        try:
+            response = requests.get(self.check, params=data)
+            json_response = json.loads(response.content)
+            if int(json_response.get('status', 0)) == 200:
+                print(json_response.get('data'))
+                return json_response.get('data')
+            if int(json_response.get('code', 0)) == 200:
+                print(json_response.get('data'))
+                return json_response.get('data')
+            response.close()
+        except Exception as e:
+            self.log.error('pdf 校验失败 {}'.format(e))
+            return True
+
+    def upload_file(self, filename, data):
+        try:
+            response = requests.get("https://jinrui.sanbinit.cn/api/file/get_token")
+            content = json.loads(response.content)
+            token = content.get('data')
+        except Exception as e:
+            self.log.error('获取auth 失败 {}'.format(e))
+            return False
+
+        if not token:
+            self.log.error('获取auth 失败 token 为空')
+            return False
+        try:
+            auth = oss2.StsAuth(token['Credentials']['AccessKeyId'],
+                                token['Credentials']['AccessKeySecret'],
+                                token['Credentials']['SecurityToken'])
+            bucket = oss2.Bucket(auth, endpoint, bucket_name)
+            bucket.put_object_from_file(filename, data)
+        except Exception as e:
+            self.log.error('文件上传到oss 失败 {}'.format(e))
+            return False
+
+        return True
 
 
 class ConfigSettings(object):
