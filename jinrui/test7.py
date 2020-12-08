@@ -2,6 +2,8 @@
 import json
 import os
 import platform
+import random
+import string
 import time
 import sched
 from datetime import datetime
@@ -47,6 +49,7 @@ class ScanPdf(object):
         self.cf = ConfigSettings(cfg_path)
         self.filenamelist = self.cf.sections()
         self.log.info('start')
+        print('start')
 
     def scan_dir(self, inc):
         # 扫描基础目录 获取pdf类型
@@ -97,19 +100,20 @@ class ScanPdf(object):
 
     def upload_pdf(self, pdf_use, paper_name, path, pdfname):
         if self.check_pdf(pdf_use, path):
-            self.log.error('文件已上传')
+            self.log.error('{} 文件上传不符合要求'.format(path))
+            print('{} 文件上传不符合要求'.format(path))
             return
         time_now = datetime.now()
         year = str(time_now.year)
         month = str(time_now.month)
         day = str(time_now.day)
+        shuffix = os.path.splitext(pdfname)[-1]
+        new_name = self.random_name(shuffix)
         objname = '/img/{folder}/{year}/{month}/{day}/{img_name}'.format(
-            folder='pdf', year=year, month=month, day=day, img_name=pdfname)
+            folder='pdf', year=year, month=month, day=day, img_name=new_name)
         if not self.upload_file(objname[1:], path):
             return
-        # files = {
-        #     "file": (pdfname, open(path, "rb"), "application/pdf")
-        # }
+
         oss_area = 'https://{}.{}'.format(bucket_name, endpoint)
         pdf_url = oss_area + objname
         data = {
@@ -122,12 +126,15 @@ class ScanPdf(object):
             response = requests.post(self.url, params=data)
             json_response = json.loads(response.content)
             if int(json_response.get('status', 0)) == 200:
-                self.log.info('文件上传成功 {}'.format(json_response.get('message')))
+                self.log.info('{} 文件上传成功 {}'.format(path, json_response.get('message')))
+                print('{} 文件上传成功 {}'.format(path, json_response.get('message')))
             if int(json_response.get('code', 0)) == 200:
-                self.log.error('文件上传失败 {}'.format(json_response.get('message')))
+                self.log.error('{} 文件上传失败 {}'.format(path, json_response.get('message')))
+                print('{} 文件上传失败 {}'.format(path, json_response.get('message')))
             response.close()
         except Exception as e:
-            self.log.error('文件上传失败 {}'.format(e))
+            self.log.error('{} 文件上传失败 {}'.format(path, e))
+            print('{} 文件上传失败 {}'.format(path, e))
         finally:
             if not self.cf.cf.has_section(path):
                 # 记录文件名到配置文件
@@ -135,6 +142,7 @@ class ScanPdf(object):
                 # 全局变量添加文件名
                 self.filenamelist.append(path)
             self.log.info('文件上传完成')
+            print('{}文件上传完成'.format(path))
 
     def check_pdf(self, pdfuse, pdfaddress):
         data = {
@@ -145,10 +153,10 @@ class ScanPdf(object):
             response = requests.get(self.check, params=data)
             json_response = json.loads(response.content)
             if int(json_response.get('status', 0)) == 200:
-                print(json_response.get('data'))
+                print('{}: {}'.format(pdfaddress, json_response.get('message')))
                 return json_response.get('data')
             if int(json_response.get('code', 0)) == 200:
-                print(json_response.get('data'))
+                print('{}: {}'.format(pdfaddress, json_response.get('message')))
                 return json_response.get('data')
             response.close()
         except Exception as e:
@@ -162,10 +170,12 @@ class ScanPdf(object):
             token = content.get('data')
         except Exception as e:
             self.log.error('获取auth 失败 {}'.format(e))
+            print('获取auth 失败 {}'.format(e))
             return False
 
         if not token:
             self.log.error('获取auth 失败 token 为空')
+            print('获取auth 失败 token 为空')
             return False
         try:
             auth = oss2.StsAuth(token['Credentials']['AccessKeyId'],
@@ -174,10 +184,17 @@ class ScanPdf(object):
             bucket = oss2.Bucket(auth, endpoint, bucket_name)
             bucket.put_object_from_file(filename, data)
         except Exception as e:
-            self.log.error('文件上传到oss 失败 {}'.format(e))
+            self.log.error('{} 文件上传到oss 失败 {}'.format(data, e))
+            print('{} 文件上传到oss 失败 {}'.format(data, e))
             return False
 
         return True
+
+    @staticmethod
+    def random_name(shuffix):
+        myStr = string.ascii_letters + '12345678'
+        res = ''.join(random.choice(myStr) for _ in range(20)) + shuffix
+        return res
 
 
 class ConfigSettings(object):

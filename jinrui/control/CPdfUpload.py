@@ -114,12 +114,23 @@ class CPdfUpload(object):
         pdf_ip = request.remote_addr
         pdf_use = data.get('pdfuse')
         pdf_address = data.get('pdfaddress')
+        school = j_school_network.query.filter(
+            j_school_network.net_ip == pdf_ip, j_school_network.isdelete == false()).first()
+        # pdf_school = school.school_name
+        msg = '文件正常'
+        if not school:
+            current_app.logger.error('ip 非法，请联系管理员')
+            msg = 'ip 非法，请联系管理员'
+            return Success(msg, data=True)
 
-        existlist = j_answer_pdf.query.join(j_school_network, j_school_network.net_ip==j_answer_pdf.pdf_ip).filter(
+        existlist = j_answer_pdf.query.join(j_school_network, j_school_network.net_ip == j_answer_pdf.pdf_ip).filter(
             j_answer_pdf.pdf_ip == pdf_ip, j_answer_pdf.pdf_use == pdf_use, j_school_network.isdelete == false(),
             j_answer_pdf.pdf_address == pdf_address, j_answer_pdf.isdelete == false()).all()
+        if existlist:
+            msg = '文件已上传'
+            current_app.logger.error('文件已上传')
 
-        return Success('获取成功', data=bool(existlist))
+        return Success(msg, data=bool(existlist))
 
     @staticmethod
     def random_name(shuffix):
