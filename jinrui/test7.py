@@ -18,8 +18,8 @@ except Exception as e:
 
 schedule = sched.scheduler(time.time, time.sleep)
 
-endpoint = 'oss-cn-shanghai.aliyuncs.com'
-bucket_name = 'jinrui-sheet'
+endpoint = 'oss-cn-hangzhou.aliyuncs.com'
+bucket_name = 'image-jinrui'
 
 
 class ScanPdf(object):
