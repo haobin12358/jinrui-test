@@ -12,3 +12,10 @@ class APaper(Resource):
         }
 
         return apis
+
+    def post(self, paper):
+        apis = {
+            'html_to_pdf': self.cpaper.html_to_pdf
+        }
+
+        return apis
