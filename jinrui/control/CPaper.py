@@ -212,3 +212,30 @@ class CPaper():
                             "阅读理解", "任务型阅读", "词汇运用", "语法填空", "书面表达"]
         index = ch_question_dict.index(cn_question)
         return en_question_dict[index]
+
+    def html_to_pdf(self):
+        data = parameter_required(("html_str", ))
+        import imgkit, platform, os, uuid, shutil, oss2
+        from jinrui.config.secret import ALIOSS_BUCKET_NAME, ALIOSS_ENDPOINT, ACCESS_KEY_ID, ACCESS_KEY_SECRET
+        pdf_uuid = str(uuid.uuid1())
+        if platform.system() == "Windows":
+            pdf_path = "D:\\jinrui_pdf\\" + pdf_uuid + "\\"
+        else:
+            pdf_path = "/tmp/jinrui_pdf/" + pdf_uuid + "/"
+        if not os.path.exists(pdf_path):
+            os.makedirs(pdf_path)
+        imgkit.from_string(data.get("html_str"), pdf_path + "pdf-" + pdf_uuid + ".pdf")
+
+        auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
+        bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
+        pdf_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + "pdf-" + pdf_uuid + ".pdf"
+        result = bucket.put_object_from_file("pdf-" + pdf_uuid + ".pdf", pdf_path + "pdf-" + pdf_uuid + ".pdf")
+
+        return {
+            "code": 200,
+            "success": True,
+            "message": "创建成功",
+            "data": {
+                "pdf_url": pdf_url
+            }
+        }
