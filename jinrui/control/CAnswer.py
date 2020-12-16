@@ -86,7 +86,7 @@ class CAnswer():
                 zip_file.extract(names, zip_save_path + "_files/")
             zip_file.close()
 
-            paper = j_paper.query.filter(zip_dict.zip_paper, j_paper.type == "A").first_("未找到该试卷")
+            paper = j_paper.query.filter(j_paper.name == zip_dict.zip_paper, j_paper.type == "A").first_("未找到该试卷")
             sheet_id = paper.sheet_id
             sheet = j_answer_sheet.query.filter(j_answer_sheet.id == sheet_id).first_("未找到答题卡")
             # 获取pdf文件列表

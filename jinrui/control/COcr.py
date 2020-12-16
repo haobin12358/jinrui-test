@@ -1724,7 +1724,7 @@ class COcr():
                     dot_dict["ocr_dot"] = dot["score_dot"]
                     dot_dict["cut_dot"] = dot["dot"]
                     dot_dict["ocr_height"] = dot["score_height"]
-                    dot_dict["cut_height"] = dot["height"]
+                    dot_dict["cut_height"] = dot["every_height"]
                     dot_dict["index"] = "{0}".format(str(dot["start"]))
                     dot_dict["ocr_width"] = dot["score_width"]
                     dot_dict["cut_width"] = dot["every_width"]
@@ -1739,7 +1739,7 @@ class COcr():
                     dot_dict["ocr_dot"] = None
                     dot_dict["cut_dot"] = dot["dot"]
                     dot_dict["ocr_height"] = None
-                    dot_dict["cut_height"] = dot["height"]
+                    dot_dict["cut_height"] = dot["every_height"]
                     dot_dict["index"] = "{0}".format(str(dot["start"]))
                     dot_dict["ocr_width"] = None
                     dot_dict["cut_width"] = dot["every_width"]
@@ -1920,7 +1920,7 @@ class COcr():
                     dot_dict["ocr_dot"] = dot["score_dot"]
                     dot_dict["cut_dot"] = dot["dot"]
                     dot_dict["ocr_height"] = dot["score_height"]
-                    dot_dict["cut_height"] = dot["height"]
+                    dot_dict["cut_height"] = dot["every_height"]
                     dot_dict["index"] = "{0}".format(str(dot["start"]))
                     dot_dict["ocr_width"] = dot["score_width"]
                     dot_dict["cut_width"] = dot["every_width"]
@@ -1935,7 +1935,7 @@ class COcr():
                     dot_dict["ocr_dot"] = None
                     dot_dict["cut_dot"] = dot["dot"]
                     dot_dict["ocr_height"] = None
-                    dot_dict["cut_height"] = dot["height"]
+                    dot_dict["cut_height"] = dot["every_height"]
                     dot_dict["index"] = "{0}".format(str(dot["start"]))
                     dot_dict["ocr_width"] = None
                     dot_dict["cut_width"] = dot["every_width"]
