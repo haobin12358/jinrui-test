@@ -16,12 +16,13 @@ from lxml import etree
 import matplotlib.pyplot as plt
 from flask import current_app
 
+from jinrui.config.secret import ALIOSS_BUCKET_NAME, ALIOSS_ENDPOINT
 from jinrui.extensions.error_response import ParamsError
 from jinrui.extensions.register_ext import ali_oss
 
 
 class CAutopic():
-    oss_domain = 'https://jinrui-sheet.oss-cn-shanghai.aliyuncs.com'
+    oss_domain = 'https://{}.{}'.format(ALIOSS_BUCKET_NAME, ALIOSS_ENDPOINT)
     # path_wkhtmltopdf_image = r'D:\\wkhtmltopdf\\bin\\wkhtmltoimage.exe'
     # path_wkhtmltopdf_image = r'/usr/bin/wkhtmltoimage'
     # config = pdfkit.configuration(wkhtmltopdf=path_wkhtmltopdf)
