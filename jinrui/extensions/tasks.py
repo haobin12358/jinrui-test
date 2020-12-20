@@ -37,9 +37,25 @@ from jinrui.extensions.register_ext import celery, db
 def ocr_fix():
     try:
         from jinrui.control.COcr import COcr
-        cocr = COcr().mock_booklet()
+        cocr = COcr().deal_pdf_to_jpg()
     except:
-        current_app.logger.info(">>>>>>>>>>>>>>异常的ocr任务")
+        current_app.logger.info(">>>>>>>>>>>>>>解析pdf失败")
+
+@celery.task(name='upload_jpg')
+def upload_jpg():
+    try:
+        from jinrui.control.COcr import COcr
+        cocr = COcr().upload_jpg_json()
+    except:
+        current_app.logger.info(">>>>>>>>>>>>>读写json失败")
+
+@celery.task(name='mock_booklet')
+def mock_booklet():
+    try:
+        from jinrui.control.COcr import COcr
+        cocr = COcr().deal_alljpg_in_onepdf()
+    except:
+        current_app.logger.info(">>>>>>>>>>>>>生成答卷失败")
 
 @celery.task(name="deal_zip")
 def deal_zip():

@@ -143,6 +143,25 @@ class j_answer_pdf(Base):
     pdf_ip = Column(String(20), comment="pdf上传ip")
     pdf_school = Column(String(255), comment="pdf上传学校")
     upload_id = Column(String(64), comment="上传记录id")
+    pdf_index = Column(Integer, comment="pdf页码")
+    pdf_path = Column(String(255), comment="pdf暂存路径")
+
+class j_answer_jpg(Base):
+    """
+    答卷单页
+    """
+    __tablename__ = "j_answer_jpg"
+    isdelete = Column(Boolean, default=False, comment='是否删除')
+    createtime = Column(DateTime, default=datetime.now, comment='创建时间')
+    updatetime = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')
+    jpg_id = Column(String(64), primary_key=True)
+    pdf_id = Column(String(64), comment="关联pdf的id")
+    pdf_index = Column(Integer, comment="pdf总页码")
+    jpg_status = Column(String(10), comment="300401未解析300402已解析300404解析失败")
+    jpg_dict = Column(LONGTEXT, comment="算法返回的json")
+    jpg_index = Column(Integer, comment="页码")
+    jpg_url = Column(String(255), comment="jpg的url")
+    jpg_log_path = Column(String(255), comment="算法返回的json存储地址")
 
 class j_answer_png(Base):
     """
@@ -155,6 +174,7 @@ class j_answer_png(Base):
     png_id = Column(String(64), primary_key=True)
     png_url = Column(String(255), comment="图片url")
     pdf_id = Column(String(64), comment="扫描件id")
+    jpg_id = Column(String(64), comment="扫描件单页id")
     png_result = Column(String(255), comment="解析结果")
     png_status = Column(String(10), comment="303待处理302已处理301已批阅304待批阅")
     png_type = Column(String(10), comment="21单选22多选23判断24填空all25填空ocr26简答all27简答ocr28sn29考号")
