@@ -249,11 +249,11 @@ class COcr():
                             auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
                             bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
                             page_two_file_fullname = (pdf_path.replace("/tmp", "tmp") + jpg_dict[1]).split(".")[0]
-                            page_two_ext = (pdf_path + jpg_dict[0]).split(".")[1]
+                            page_two_ext = (pdf_path + jpg_dict[1]).split(".")[1]
                             page_two_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" \
                                            + page_two_file_fullname + "." + page_two_ext
                             result_two = bucket.put_object_from_file(page_two_file_fullname + "." + page_two_ext,
-                                                                 pdf_path + jpg_dict[0])
+                                                                 pdf_path + jpg_dict[1])
                             current_app.logger.info(">>>>>>>>>>上传oss：" + str(result_two.status))
                             if result_two.status != 200:
                                 current_app.logger.info(">>>>>>>>>>>>>>>>>>>上传oss失败,页码:" + str(jpg_index + 2))
@@ -282,11 +282,11 @@ class COcr():
                             auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
                             bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
                             page_three_file_fullname = (pdf_path.replace("/tmp", "tmp") + jpg_dict[2]).split(".")[0]
-                            page_three_ext = (pdf_path + jpg_dict[0]).split(".")[1]
+                            page_three_ext = (pdf_path + jpg_dict[2]).split(".")[1]
                             page_three_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" \
                                              + page_three_file_fullname + "." + page_three_ext
                             result_three = bucket.put_object_from_file(page_three_file_fullname + "." + page_three_ext,
-                                                                 pdf_path + jpg_dict[0])
+                                                                 pdf_path + jpg_dict[2])
                             current_app.logger.info(">>>>>>>>>>上传oss：" + str(result_three.status))
                             if result_three.status != 200:
                                 current_app.logger.info(">>>>>>>>>>>>>>>>>>>上传oss失败,页码:" + str(jpg_index + 3))
@@ -315,10 +315,11 @@ class COcr():
                             auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
                             bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
                             page_four_file_fullname = (pdf_path.replace("/tmp", "tmp") + jpg_dict[3]).split(".")[0]
-                            page_four_ext = (pdf_path + jpg_dict[0]).split(".")[1]
-                            page_four_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + page_four_file_fullname + "." + page_four_ext
+                            page_four_ext = (pdf_path + jpg_dict[3]).split(".")[1]
+                            page_four_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" \
+                                            + page_four_file_fullname + "." + page_four_ext
                             result_four = bucket.put_object_from_file(page_four_file_fullname + "." + page_four_ext,
-                                                                 pdf_path + jpg_dict[0])
+                                                                 pdf_path + jpg_dict[3])
                             current_app.logger.info(">>>>>>>>>>上传oss：" + str(result_four.status))
                             if result_four.status != 200:
                                 current_app.logger.info(">>>>>>>>>>>>>>>>>>>上传oss失败,页码:" + str(jpg_index + 4))
@@ -574,7 +575,8 @@ class COcr():
                                             "question_number": question.question_number,
                                             "score": 0,
                                             "question_url": None,
-                                            "status": "304"
+                                            "status": "304",
+                                            "true_score": None
                                         }
                                         score_instance = j_score.create(score_dict)
                                         db.session.add(score_instance)
@@ -597,6 +599,19 @@ class COcr():
 
                             else:
                                 # 第一页
+                                page_one_dict = {}
+                                page_two_dict = {}
+                                page_three_dict = {}
+                                page_four_dict = {}
+                                for page_dict in json.loads(pdf.sheet_dict):
+                                    if page_dict["page"] == 1:
+                                        page_one_dict = page_dict["data"]
+                                    elif page_dict["page"] == 2:
+                                        page_two_dict = page_dict["data"]
+                                    elif page_dict["page"] == 3:
+                                        page_three_dict = page_dict["data"]
+                                    elif page_dict["page"] == 4:
+                                        page_four_dict = page_dict["data"]
                                 for result_dict in jpg_dict_one:
                                     pic_path = result_dict["cut_img_path"]
                                     # oss
@@ -1245,7 +1260,8 @@ class COcr():
                 "question_number": result_dict["index"],
                 "score": score,
                 "question_url": jpg_url,
-                "status": png_status
+                "status": png_status,
+                "true_score": json.dumps([0, question.score])
             }
             current_app.logger.info(score_dict)
             png_instance = j_answer_png.create(png_dict)

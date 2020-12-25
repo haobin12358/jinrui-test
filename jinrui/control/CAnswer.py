@@ -56,6 +56,34 @@ class CAnswer():
             "message": "上传成功"
         }
 
+    def delete_upload(self):
+        """
+        逻辑删除答卷
+        """
+        args = parameter_required(("id", "user_id"))
+        user_id = args.get("user_id")
+        upload_id = args.get("id")
+
+        user = j_role.query.filter(j_role.manager_id == user_id).first()
+        if user.role_type != "SUPER_ADMIN":
+            return {
+                "code": 405,
+                "success": False,
+                "message": "无权限"
+            }
+        upload = j_answer_upload.query.filter(j_answer_upload.id == upload_id).first()
+        with db.auto_commit():
+            upload_instance = upload.update({
+                "is_delete": 1
+            }, null="not")
+            db.session.add(upload_instance)
+
+        return {
+            "code": 200,
+            "success": True,
+            "message": "删除成功"
+        }
+
     def deal_zip(self):
         zip_dict = j_answer_zip.query.filter(j_answer_zip.isdelete == 0, j_answer_zip.zip_status == "300101")\
             .order_by(j_answer_zip.createtime.desc()).first()
@@ -215,6 +243,7 @@ class CAnswer():
                 answer.png_status = "待处理"
             else:
                 answer.png_status = "未知状态"
+            answer.createtime = answer.createtime.strftime("%Y-%m-%d %H:%M")
         all_answer = j_answer_png.query.filter(*filter_args).all()
 
         total = len(all_answer)

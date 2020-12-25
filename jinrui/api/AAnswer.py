@@ -17,7 +17,8 @@ class AAnswer(Resource):
     def get(self, answer):
         apis = {
             "get_answer_list": self.canswer.get_answer_list,
-            "deal_zip": self.canswer.deal_zip
+            "deal_zip": self.canswer.deal_zip,
+            "delete_upload": self.canswer.delete_upload
         }
 
         return apis
