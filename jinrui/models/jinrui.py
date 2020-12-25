@@ -107,6 +107,7 @@ class j_score(Base):
     question_number = Column(Integer, comment="所在试卷的编号")
     answer = Column(String(16), comment="学生答案")
     status = Column(String(10), comment="303解析失败301解析成功302未批阅304已批阅")
+    true_score = Column(Text, comment="允许的分数范围")
 
 class j_answer_zip(Base):
     """
