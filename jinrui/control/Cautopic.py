@@ -64,13 +64,13 @@ class CAutopic():
         :param filepath: 路径
         :return:
         """
-        del_list = os.listdir(filepath)
-        for f in del_list:
-            file_path = os.path.join(filepath, f)
-            if os.path.isfile(file_path):
-                os.remove(file_path)
-            elif os.path.isdir(file_path):
-                shutil.rmtree(file_path)
+        # del_list = os.listdir(filepath)
+        # for f in del_list:
+        #     file_path = os.path.join(filepath, f)
+        if os.path.isfile(filepath):
+            os.remove(filepath)
+        elif os.path.isdir(filepath):
+            shutil.rmtree(filepath)
 
     def analysis_word(self, doc_path):
         html_path = self.get_html_path(doc_path)
@@ -112,8 +112,10 @@ class CAutopic():
             paper_dict_copy[paper] = ''.join([str(i) for i in paper_dict.get(paper)])
         img_paper_dict = self.transform_html_to_png(html_path, head, paper_dict_copy)
         current_app.logger.info('end analysis docx ')
-        self.del_file(html_path)
+        #
         os.remove(doc_path)
+        self.del_file(html_path)
+
         return paper_dict_copy, img_paper_dict
 
     def _change_img(self, new_sub_titles, local_path):
