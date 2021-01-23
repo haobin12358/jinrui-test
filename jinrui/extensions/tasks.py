@@ -9,6 +9,7 @@ import requests
 import os
 from datetime import datetime
 
+
 # def add_async_task(func, start_time, func_args, conn_id=None, queue='high_priority'):
 #     """
 #     添加异步任务
@@ -43,8 +44,9 @@ def use_ocr():
     except:
         current_app.logger.info(">>>>>>>>>>>ocr获取路径失败")
 
-#@celery.task(name="use_detect")
-#def use_detect():
+
+# @celery.task(name="use_detect")
+# def use_detect():
 #    try:
 #        from jinrui.control.COcr import COcr
 #        cocr = COcr().use_detect()
@@ -59,6 +61,7 @@ def ocr_fix():
     except:
         current_app.logger.info(">>>>>>>>>>>>>>解析pdf失败")
 
+
 @celery.task(name='upload_jpg')
 def upload_jpg():
     try:
@@ -66,6 +69,7 @@ def upload_jpg():
         cocr = COcr().upload_jpg_json()
     except:
         current_app.logger.info(">>>>>>>>>>>>>读写json失败")
+
 
 @celery.task(name='mock_booklet')
 def mock_booklet():
@@ -75,6 +79,7 @@ def mock_booklet():
     except:
         current_app.logger.info(">>>>>>>>>>>>>生成答卷失败")
 
+
 @celery.task(name="deal_zip")
 def deal_zip():
     try:
@@ -82,6 +87,7 @@ def deal_zip():
         canswer = CAnswer().deal_zip()
     except:
         current_app.logger.info(">>>>>>>>>>>>处理zip失败")
+
 
 @celery.task(name="download_pdf")
 def download_pdf():
@@ -104,6 +110,7 @@ def get_path(fold):
         os.makedirs(filepath)
     return filepath
 
+
 def get_fetch(path, cp):
     # if qiniu:
     #     content = requests.get(MEDIA_HOST + path)
@@ -117,6 +124,7 @@ def get_fetch(path, cp):
     with open(filename, 'wb') as head:
         head.write(content.content)
     return filename
+
 
 @celery.task(name='auto_setpic')
 def auto_setpic():
