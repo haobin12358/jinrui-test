@@ -85,10 +85,17 @@ class j_answer_booklet(Base):
     create_time = Column(DATE, comment="创建时间")
     update_time = Column(DATE, comment="更新时间")
     url = Column(Text, comment="oss链接")
-    upload_by = Column(String(32), comment="上传人id")
+    upload_by = Column(String(32), comment="上传人")
     grade_num = Column(Integer, comment="已批阅数目")
     upload_id = Column(String(64), comment="答卷上传记录id")
     is_miss = Column(String(10), comment="是否缺考301缺考302未缺考")
+    upload_byid = Column(String(64), comment="上传人id")
+    school_name = Column(String(128), comment="所属学校")
+    school_id = Column(String(64), comment="学校id")
+    grade_id = Column(String(64), comment="年级id")
+    class_id = Column(String(64), comment="班级id")
+    grade_name = Column(String(128), comment="年级名称")
+    class_name = Column(String(128), comment="班级名称")
 
 class j_score(Base):
     """
@@ -120,6 +127,7 @@ class j_answer_zip(Base):
     zip_id = Column(String(64), primary_key=True)
     zip_url = Column(String(255), comment="zip地址", nullable=False)
     zip_upload_user = Column(String(255), comment="上传人", default="system")
+    zip_upload_userid = Column(String(64), comment="上传人id")
     zip_status = Column(String(10), comment="300101未解析300102已解析300103解析失败")
     zip_ip = Column(String(20), comment="上传ip")
     zip_paper = Column(String(255), comment="zip对应的考卷")
@@ -146,6 +154,7 @@ class j_answer_pdf(Base):
     upload_id = Column(String(64), comment="上传记录id")
     pdf_index = Column(Integer, comment="pdf页码")
     pdf_path = Column(String(255), comment="pdf暂存路径")
+    jpg_dir = Column(LONGTEXT, comment="jpg路徑")
 
 class j_answer_jpg(Base):
     """
@@ -163,6 +172,8 @@ class j_answer_jpg(Base):
     jpg_index = Column(Integer, comment="页码")
     jpg_url = Column(String(255), comment="jpg的url")
     jpg_log_path = Column(String(255), comment="算法返回的json存储地址")
+    page_dict = Column(LONGTEXT, comment="传入算法的json")
+    page_path = Column(Text, comment="传入算法的图片本地路径")
 
 class j_answer_png(Base):
     """

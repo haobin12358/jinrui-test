@@ -35,6 +35,22 @@ from datetime import datetime
 #         conn.delete(conn_id)
 #         current_app.logger.info(f'取消任务成功 task_id:{exist_task_id}')
 
+@celery.task(name="use_ocr")
+def use_ocr():
+    try:
+        from jinrui.control.COcr import COcr
+        cocr = COcr().use_ocr()
+    except:
+        current_app.logger.info(">>>>>>>>>>>ocr获取路径失败")
+
+#@celery.task(name="use_detect")
+#def use_detect():
+#    try:
+#        from jinrui.control.COcr import COcr
+#        cocr = COcr().use_detect()
+#    except:
+#        current_app.logger.info(">>>>>>>>>ocr触发失败")
+
 @celery.task(name='ocr_fix')
 def ocr_fix():
     try:
