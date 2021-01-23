@@ -46,7 +46,8 @@ class CAnswer():
                 "zip_status": "300101",
                 "zip_ip": pdf_ip,
                 "zip_paper": data.get("paperId"),
-                "zip_use": zip_use
+                "zip_use": zip_use,
+                "zip_upload_userid": data.get("id")
             }
             zip_instance = j_answer_zip.create(zip_dict)
             db.session.add(zip_instance)
@@ -186,6 +187,31 @@ class CAnswer():
                 }, null="not")
                 db.session.add(zip_instance)
 
+                user_id = zip_dict.zip_upload_userid
+                orgid_list = []
+                roletype_list = []
+                roles = j_role.query.filter(j_role.manager_id == user_id).all()
+                if roles:
+                    for role in roles:
+                        if role.role_type not in roletype_list:
+                            roletype_list.append(role.role_type)
+                        if role.org_id not in orgid_list:
+                            orgid_list.append(role.org_id)
+
+                class_id = json.dumps([])
+                if "TEACHER" in roletype_list or "CLASS" in roletype_list:
+                    class_id = json.dumps(orgid_list)
+
+                grade_id = None
+                if "GRADE" in roletype_list:
+                    if orgid_list:
+                        grade_id = orgid_list[0]
+
+                school_id = None
+                if "SCHOOL" in roletype_list or "SCHOOL_ADMIN" in roletype_list:
+                    if orgid_list:
+                        school_id = orgid_list[0]
+
                 upload_dict = {
                     "is_delete": 0,
                     "create_time": datetime.now(),
@@ -193,7 +219,14 @@ class CAnswer():
                     "id": upload_id,
                     "upload_by": zip_dict.zip_upload_user,
                     "status": "处理中",
-                    "url": zip_dict.zip_url
+                    "url": zip_dict.zip_url,
+                    "upload_byid": user_id,
+                    "school_id": school_id,
+                    "school_name": None,
+                    "grade_id": grade_id,
+                    "grade_name": None,
+                    "class_id": class_id,
+                    "class_name": None
                 }
                 upload_instance = j_answer_upload.create(upload_dict)
                 db.session.add(upload_instance)
