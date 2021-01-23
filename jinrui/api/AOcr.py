@@ -22,7 +22,8 @@ class AOcr(Resource):
     def post(self, ocr):
         apis = {
             "mock_pdf": self.cocr.mock_pdf,
-            "test_ocr": self.cocr.test_ocr
+            "test_ocr": self.cocr.test_ocr,
+            "api_upload_jpg_json": self.cocr.api_upload_jpg_json
         }
 
         return apis

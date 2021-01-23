@@ -7,7 +7,23 @@ from jinrui.extensions.register_ext import db
 from ..extensions.params_validates import parameter_required
 from jinrui.models.jinrui import j_question, j_answer_pdf, j_answer_png, j_student, j_organization, j_school_network, \
     j_answer_zip, j_paper, j_score, j_answer_booklet, j_answer_upload, j_answer_sheet, j_answer_jpg
-from flask import current_app
+from flask import current_app, request
+
+from threading import Thread
+class MyThread(Thread):
+    def __init__(self, func, args):
+        super(MyThread, self).__init__()
+        self.func = func
+        self.args = args
+
+    def run(self):
+        self.result = self.func(*self.args)
+
+    def get_result(self):
+        try:
+            return self.result
+        except Exception:
+            return None
 
 class COcr():
 
@@ -17,17 +33,23 @@ class COcr():
         self.width_less = 0
         self.height_less = 0
         self.jpg_list = []
+        self.result_path = ""
 
     def _use_ocr(self, image_path, image_dict):
         model = "/root/sheet_manager_test/debug-0.2/models_0_3/"
         import sheet
         d = sheet.Detector(model)
+        current_app.logger.info(">>>>>>>>>>>>>>>image_path:" + image_path)
         result_path = d.set_img_path(image_path)
-        data = d.detect_sheet(json_dict=image_dict)
+        current_app.logger.info(">>>>>>>>>>>result_path:" + str(result_path))
         if result_path:
             log_path = result_path
         else:
             log_path = ""
+        # TODO 改动点
+        d.detect_sheet(json_dict=image_dict)
+        current_app.logger.info(">>>>>>>>>>>>>>>end ocr>>>>>>>>>>>>>")
+
         return log_path
 
     def test_ocr(self):
@@ -38,6 +60,25 @@ class COcr():
         result_path = d.set_img_path(data.get("image_path"))
         data = d.detect_sheet(json_dict=data.get("image_dict"))
         return result_path
+
+    def use_detect(self):
+        jpg_dict = j_answer_jpg.query.filter(j_answer_jpg.jpg_status == "300401").order_by(j_answer_jpg.createtime.desc()).first()
+        if jpg_dict:
+            image_dict = json.loads(jpg_dict.page_dict)
+            image_path = jpg_dict.page_path
+            with db.auto_commit():
+                jpg_instance = jpg_dict.update({
+                    "jpg_status": "300403"
+                })
+                db.session.add(jpg_instance)
+            current_app.logger.info(">>>>>>>>>>>>>start detect>>>>>>>>>>>>>>")
+            model = "/root/sheet_manager_test/debug-0.2/models_0_3/"
+            import sheet
+            d = sheet.Detector(model)
+            d.detect_sheet(json_dict=image_dict, img_path=image_path)
+            current_app.logger.info(">>>>>>>>>>>>>end detect>>>>>>>>>>>>>>")
+        else:
+            current_app.logger.info(">>>>>>>>>>>>need detect number:0")
 
 
     def _conver_img(self, pdf_path, pdf_save_path, pdf_name):
@@ -191,170 +232,226 @@ class COcr():
                         jpg_dir = self._conver_img(pdf_path, pdf_save_path, pdf_name[-1])
                         current_app.logger.info(jpg_dir)
                         current_app.logger.info(">>>>>>>>>>>>end deal pdf to jpg>>>>>>>>>>>>>>>>>>>>>>>>>")
-                        # 创建每页的json
-                        page_one_dict = {}
-                        page_two_dict = {}
-                        page_three_dict = {}
-                        page_four_dict = {}
-                        for page_dict in json.loads(pdf.sheet_dict):
-                            if page_dict["page"] == 1:
-                                page_one_dict = self._make_dict_ocr(page_dict, pdf)
-                            elif page_dict["page"] == 2:
-                                page_two_dict = self._make_dict_ocr(page_dict, pdf)
-                            elif page_dict["page"] == 3:
-                                page_three_dict = self._make_dict_ocr(page_dict, pdf)
-                            elif page_dict["page"] == 4:
-                                page_four_dict = self._make_dict_ocr(page_dict, pdf)
 
-                        jpg_index = 0
-                        # pdf总页数
-                        pdf_index = len(jpg_dir)
-                        while jpg_index < len(jpg_dir):
-                            current_app.logger.info(">>>>>>>>>>>>>>>>第" + str(jpg_index + 1) + "页开始>>>>>>>>>>>>")
-                            jpg_dict = jpg_dir[jpg_index: jpg_index + 4]
-                            # oss
-                            auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
-                            bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
-                            page_one_file_fullname = (pdf_path.replace("/tmp", "tmp") + jpg_dict[0]).split(".")[0]
-                            page_one_ext = (pdf_path + jpg_dict[0]).split(".")[1]
-                            page_one_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + \
-                                           page_one_file_fullname + "." + page_one_ext
-                            result_one = bucket.put_object_from_file(page_one_file_fullname + "." + page_one_ext,
-                                                                 pdf_path + jpg_dict[0])
-                            current_app.logger.info(">>>>>>>>>>上传oss：" + str(result_one.status))
-                            if result_one.status != 200:
-                                current_app.logger.info(">>>>>>>>>>>>>>>>>>>上传oss失败,页码:" + str(jpg_index + 1))
-                            log_path_one = self._use_ocr(pdf_path + jpg_dict[0], page_one_dict)
-                            current_app.logger.info(">>>>>>>>>>>log_path:" + log_path_one)
-                            if not log_path_one:
-                                current_app.logger.info(">>>>>>>>>>>>>>>未成功获取路径,页码:" + str(jpg_index + 1))
-                                raise Exception(">>>>>>>>>>>>>>>未成功获取路径,页码:" + str(jpg_index + 1))
-                            with db.auto_commit():
-                                jpg_tect = {
-                                    "isdelete": 0,
-                                    "createtime": datetime.now(),
-                                    "updatetime": datetime.now(),
-                                    "jpg_id": str(uuid.uuid1()),
-                                    "pdf_id": str(pdf.pdf_id),
-                                    "pdf_index": pdf_index,
-                                    "jpg_status": "300401",
-                                    "jpg_dict": None,
-                                    "jpg_index": jpg_index + 1,
-                                    "jpg_url": page_one_url,
-                                    "jpg_log_path": log_path_one
-                                }
-                                jpg_instance = j_answer_jpg.create(jpg_tect)
-                                db.session.add(jpg_instance)
-
-                            auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
-                            bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
-                            page_two_file_fullname = (pdf_path.replace("/tmp", "tmp") + jpg_dict[1]).split(".")[0]
-                            page_two_ext = (pdf_path + jpg_dict[1]).split(".")[1]
-                            page_two_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" \
-                                           + page_two_file_fullname + "." + page_two_ext
-                            result_two = bucket.put_object_from_file(page_two_file_fullname + "." + page_two_ext,
-                                                                 pdf_path + jpg_dict[1])
-                            current_app.logger.info(">>>>>>>>>>上传oss：" + str(result_two.status))
-                            if result_two.status != 200:
-                                current_app.logger.info(">>>>>>>>>>>>>>>>>>>上传oss失败,页码:" + str(jpg_index + 2))
-                            log_path_two = self._use_ocr(pdf_path + jpg_dict[1], page_two_dict)
-                            current_app.logger.info(">>>>>>>>>>>log_path:" + log_path_two)
-                            if not log_path_two:
-                                current_app.logger.info(">>>>>>>>>>>>>>>未成功获取路径,页码:" + str(jpg_index + 2))
-                                raise Exception(">>>>>>>>>>>>>>>未成功获取路径,页码:" + str(jpg_index + 2))
-                            with db.auto_commit():
-                                jpg_tect = {
-                                    "isdelete": 0,
-                                    "createtime": datetime.now(),
-                                    "updatetime": datetime.now(),
-                                    "jpg_id": str(uuid.uuid1()),
-                                    "pdf_id": str(pdf.pdf_id),
-                                    "pdf_index": pdf_index,
-                                    "jpg_status": "300401",
-                                    "jpg_dict": None,
-                                    "jpg_index": jpg_index + 2,
-                                    "jpg_url": page_two_url,
-                                    "jpg_log_path": log_path_two
-                                }
-                                jpg_instance = j_answer_jpg.create(jpg_tect)
-                                db.session.add(jpg_instance)
-
-                            auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
-                            bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
-                            page_three_file_fullname = (pdf_path.replace("/tmp", "tmp") + jpg_dict[2]).split(".")[0]
-                            page_three_ext = (pdf_path + jpg_dict[2]).split(".")[1]
-                            page_three_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" \
-                                             + page_three_file_fullname + "." + page_three_ext
-                            result_three = bucket.put_object_from_file(page_three_file_fullname + "." + page_three_ext,
-                                                                 pdf_path + jpg_dict[2])
-                            current_app.logger.info(">>>>>>>>>>上传oss：" + str(result_three.status))
-                            if result_three.status != 200:
-                                current_app.logger.info(">>>>>>>>>>>>>>>>>>>上传oss失败,页码:" + str(jpg_index + 3))
-                            log_path_three = self._use_ocr(pdf_path + jpg_dict[2], page_three_dict)
-                            current_app.logger.info(">>>>>>>>>>>log_path:" + log_path_three)
-                            if not log_path_three:
-                                current_app.logger.info(">>>>>>>>>>>>>>>未成功获取路径,页码:" + str(jpg_index + 3))
-                                raise Exception(">>>>>>>>>>>>>>>未成功获取路径,页码:" + str(jpg_index + 3))
-                            with db.auto_commit():
-                                jpg_tect = {
-                                    "isdelete": 0,
-                                    "createtime": datetime.now(),
-                                    "updatetime": datetime.now(),
-                                    "jpg_id": str(uuid.uuid1()),
-                                    "pdf_id": str(pdf.pdf_id),
-                                    "pdf_index": pdf_index,
-                                    "jpg_status": "300401",
-                                    "jpg_dict": None,
-                                    "jpg_index": jpg_index + 3,
-                                    "jpg_url": page_three_url,
-                                    "jpg_log_path": log_path_three
-                                }
-                                jpg_instance = j_answer_jpg.create(jpg_tect)
-                                db.session.add(jpg_instance)
-
-                            auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
-                            bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
-                            page_four_file_fullname = (pdf_path.replace("/tmp", "tmp") + jpg_dict[3]).split(".")[0]
-                            page_four_ext = (pdf_path + jpg_dict[3]).split(".")[1]
-                            page_four_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" \
-                                            + page_four_file_fullname + "." + page_four_ext
-                            result_four = bucket.put_object_from_file(page_four_file_fullname + "." + page_four_ext,
-                                                                 pdf_path + jpg_dict[3])
-                            current_app.logger.info(">>>>>>>>>>上传oss：" + str(result_four.status))
-                            if result_four.status != 200:
-                                current_app.logger.info(">>>>>>>>>>>>>>>>>>>上传oss失败,页码:" + str(jpg_index + 4))
-                            log_path_four = self._use_ocr(pdf_path + jpg_dict[3], page_four_dict)
-                            current_app.logger.info(">>>>>>>>>>>log_path:" + log_path_four)
-                            if not log_path_four:
-                                current_app.logger.info(">>>>>>>>>>>>>>>未成功获取路径,页码:" + str(jpg_index + 4))
-                                raise Exception(">>>>>>>>>>>>>>>未成功获取路径,页码:" + str(jpg_index + 4))
-                            with db.auto_commit():
-                                jpg_tect = {
-                                    "isdelete": 0,
-                                    "createtime": datetime.now(),
-                                    "updatetime": datetime.now(),
-                                    "jpg_id": str(uuid.uuid1()),
-                                    "pdf_id": str(pdf.pdf_id),
-                                    "pdf_index": pdf_index,
-                                    "jpg_status": "300401",
-                                    "jpg_dict": None,
-                                    "jpg_index": jpg_index + 4,
-                                    "jpg_url": page_four_url,
-                                    "jpg_log_path": log_path_four
-                                }
-                                jpg_instance = j_answer_jpg.create(jpg_tect)
-                                db.session.add(jpg_instance)
-
-                            jpg_index += 4
                         with db.auto_commit():
                             pdf_instance = pdf.update({
                                 "pdf_index": len(jpg_dir),
-                                "pdf_path": pdf_path
+                                "pdf_path": pdf_path,
+                                "jpg_dir": json.dumps(jpg_dir),
+                                "pdf_status": "300310"
                             })
                             db.session.add(pdf_instance)
                         current_app.logger.info(">>>>>>>>>>>>pdf to png and deal ocr success>>>>>>>>>>>>")
         else:
             current_app.logger.info(">>>>>>>>>>>>>get pdf number:0")
+
+    def use_ocr(self):
+        pdf_list = j_answer_pdf.query.filter(j_answer_pdf.isdelete == 0, j_answer_pdf.pdf_status == "300310") \
+            .order_by(j_answer_pdf.createtime.desc()).all()
+        if pdf_list:
+
+            for pdf in pdf_list:
+                jpg_dir = json.loads(pdf.jpg_dir)
+                pdf_path = pdf.pdf_path
+                page_one_dict = {}
+                page_two_dict = {}
+                page_three_dict = {}
+                page_four_dict = {}
+                for page_dict in json.loads(pdf.sheet_dict):
+                    if page_dict["page"] == 1:
+                        page_one_dict = self._make_dict_ocr(page_dict, pdf)
+                    elif page_dict["page"] == 2:
+                        page_two_dict = self._make_dict_ocr(page_dict, pdf)
+                    elif page_dict["page"] == 3:
+                        page_three_dict = self._make_dict_ocr(page_dict, pdf)
+                    elif page_dict["page"] == 4:
+                        page_four_dict = self._make_dict_ocr(page_dict, pdf)
+
+                jpg_index = 0
+                # pdf总页数
+                pdf_index = len(jpg_dir)
+                while jpg_index < len(jpg_dir):
+                    current_app.logger.info(">>>>>>>>>>>>>>>>第" + str(jpg_index + 1) + "页开始>>>>>>>>>>>>")
+                    jpg_dict = jpg_dir[jpg_index: jpg_index + 4]
+                    current_app.logger.info(">>>>>>>>>>>>>>>>jpg_dict0:" + str(jpg_dict[0]))
+                    log_path_one = self._use_ocr(pdf_path + jpg_dict[0], page_one_dict)
+                    current_app.logger.info(">>>>>>>>>>>log_path:" + log_path_one)
+                    if not log_path_one:
+                        current_app.logger.info(">>>>>>>>>>>>>>>未成功获取路径,页码:" + str(jpg_index + 1))
+                        raise Exception(">>>>>>>>>>>>>>>未成功获取路径,页码:" + str(jpg_index + 1))
+
+                    # oss
+                    auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
+                    bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
+                    page_one_file_fullname = (pdf_path.replace("/tmp", "tmp") + jpg_dict[0]).split(".")[0]
+                    page_one_ext = (pdf_path + jpg_dict[0]).split(".")[1]
+                    page_one_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" + \
+                                   page_one_file_fullname + "." + page_one_ext
+
+                    result_one = bucket.put_object_from_file(page_one_file_fullname + "." + page_one_ext,
+                                                             pdf_path + jpg_dict[0])
+                    current_app.logger.info(">>>>>>>>>>上传oss：" + str(result_one.status))
+                    if result_one.status != 200:
+                        current_app.logger.info(">>>>>>>>>>>>>>>>>>>上传oss失败,页码:" + str(jpg_index + 1))
+
+                    with db.auto_commit():
+                        jpg_tect = {
+                            "isdelete": 0,
+                            "createtime": datetime.now(),
+                            "updatetime": datetime.now(),
+                            "jpg_id": str(uuid.uuid1()),
+                            "pdf_id": str(pdf.pdf_id),
+                            "pdf_index": pdf_index,
+                            "jpg_status": "300401",
+                            "jpg_dict": None,
+                            "jpg_index": jpg_index + 1,
+                            "jpg_url": page_one_url,
+                            "jpg_log_path": log_path_one,
+                            "page_dict": json.dumps(page_one_dict),
+                            "page_path": pdf_path + jpg_dict[0]
+                        }
+                        jpg_instance = j_answer_jpg.create(jpg_tect)
+                        db.session.add(jpg_instance)
+
+                    auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
+                    bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
+                    page_two_file_fullname = (pdf_path.replace("/tmp", "tmp") + jpg_dict[1]).split(".")[0]
+                    page_two_ext = (pdf_path + jpg_dict[1]).split(".")[1]
+                    page_two_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" \
+                                   + page_two_file_fullname + "." + page_two_ext
+                    result_two = bucket.put_object_from_file(page_two_file_fullname + "." + page_two_ext,
+                                                             pdf_path + jpg_dict[1])
+                    current_app.logger.info(">>>>>>>>>>上传oss：" + str(result_two.status))
+                    if result_two.status != 200:
+                        current_app.logger.info(">>>>>>>>>>>>>>>>>>>上传oss失败,页码:" + str(jpg_index + 2))
+                    log_path_two = self._use_ocr(pdf_path + jpg_dict[1], page_two_dict)
+                    current_app.logger.info(">>>>>>>>>>>log_path:" + log_path_two)
+                    if not log_path_two:
+                        current_app.logger.info(">>>>>>>>>>>>>>>未成功获取路径,页码:" + str(jpg_index + 2))
+                        raise Exception(">>>>>>>>>>>>>>>未成功获取路径,页码:" + str(jpg_index + 2))
+                    with db.auto_commit():
+                        jpg_tect = {
+                            "isdelete": 0,
+                            "createtime": datetime.now(),
+                            "updatetime": datetime.now(),
+                            "jpg_id": str(uuid.uuid1()),
+                            "pdf_id": str(pdf.pdf_id),
+                            "pdf_index": pdf_index,
+                            "jpg_status": "300401",
+                            "jpg_dict": None,
+                            "jpg_index": jpg_index + 2,
+                            "jpg_url": page_two_url,
+                            "jpg_log_path": log_path_two,
+                            "page_dict": json.dumps(page_two_dict),
+                            "page_path": pdf_path + jpg_dict[1]
+                        }
+                        jpg_instance = j_answer_jpg.create(jpg_tect)
+                        db.session.add(jpg_instance)
+
+                    auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
+                    bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
+                    page_three_file_fullname = (pdf_path.replace("/tmp", "tmp") + jpg_dict[2]).split(".")[0]
+                    page_three_ext = (pdf_path + jpg_dict[2]).split(".")[1]
+                    page_three_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" \
+                                     + page_three_file_fullname + "." + page_three_ext
+                    result_three = bucket.put_object_from_file(page_three_file_fullname + "." + page_three_ext,
+                                                               pdf_path + jpg_dict[2])
+                    current_app.logger.info(">>>>>>>>>>上传oss：" + str(result_three.status))
+                    if result_three.status != 200:
+                        current_app.logger.info(">>>>>>>>>>>>>>>>>>>上传oss失败,页码:" + str(jpg_index + 3))
+                    log_path_three = self._use_ocr(pdf_path + jpg_dict[2], page_three_dict)
+                    current_app.logger.info(">>>>>>>>>>>log_path:" + log_path_three)
+                    if not log_path_three:
+                        current_app.logger.info(">>>>>>>>>>>>>>>未成功获取路径,页码:" + str(jpg_index + 3))
+                        raise Exception(">>>>>>>>>>>>>>>未成功获取路径,页码:" + str(jpg_index + 3))
+                    with db.auto_commit():
+                        jpg_tect = {
+                            "isdelete": 0,
+                            "createtime": datetime.now(),
+                            "updatetime": datetime.now(),
+                            "jpg_id": str(uuid.uuid1()),
+                            "pdf_id": str(pdf.pdf_id),
+                            "pdf_index": pdf_index,
+                            "jpg_status": "300401",
+                            "jpg_dict": None,
+                            "jpg_index": jpg_index + 3,
+                            "jpg_url": page_three_url,
+                            "jpg_log_path": log_path_three,
+                            "page_dict": json.dumps(page_three_dict),
+                            "page_path": pdf_path + jpg_dict[2]
+                        }
+                        jpg_instance = j_answer_jpg.create(jpg_tect)
+                        db.session.add(jpg_instance)
+
+                    auth = oss2.Auth(ACCESS_KEY_ID, ACCESS_KEY_SECRET)
+                    bucket = oss2.Bucket(auth, ALIOSS_ENDPOINT, ALIOSS_BUCKET_NAME)
+                    page_four_file_fullname = (pdf_path.replace("/tmp", "tmp") + jpg_dict[3]).split(".")[0]
+                    page_four_ext = (pdf_path + jpg_dict[3]).split(".")[1]
+                    page_four_url = "https://" + ALIOSS_BUCKET_NAME + "." + ALIOSS_ENDPOINT + "/" \
+                                    + page_four_file_fullname + "." + page_four_ext
+                    result_four = bucket.put_object_from_file(page_four_file_fullname + "." + page_four_ext,
+                                                              pdf_path + jpg_dict[3])
+                    current_app.logger.info(">>>>>>>>>>上传oss：" + str(result_four.status))
+                    if result_four.status != 200:
+                        current_app.logger.info(">>>>>>>>>>>>>>>>>>>上传oss失败,页码:" + str(jpg_index + 4))
+                    log_path_four = self._use_ocr(pdf_path + jpg_dict[3], page_four_dict)
+                    current_app.logger.info(">>>>>>>>>>>log_path:" + log_path_four)
+                    if not log_path_four:
+                        current_app.logger.info(">>>>>>>>>>>>>>>未成功获取路径,页码:" + str(jpg_index + 4))
+                        raise Exception(">>>>>>>>>>>>>>>未成功获取路径,页码:" + str(jpg_index + 4))
+                    with db.auto_commit():
+                        jpg_tect = {
+                            "isdelete": 0,
+                            "createtime": datetime.now(),
+                            "updatetime": datetime.now(),
+                            "jpg_id": str(uuid.uuid1()),
+                            "pdf_id": str(pdf.pdf_id),
+                            "pdf_index": pdf_index,
+                            "jpg_status": "300401",
+                            "jpg_dict": None,
+                            "jpg_index": jpg_index + 4,
+                            "jpg_url": page_four_url,
+                            "jpg_log_path": log_path_four,
+                            "page_dict": json.dumps(page_four_dict),
+                            "page_path": pdf_path + jpg_dict[3]
+                        }
+                        jpg_instance = j_answer_jpg.create(jpg_tect)
+                        db.session.add(jpg_instance)
+
+                    jpg_index += 4
+
+                with db.auto_commit():
+                    pdf_instance = pdf.update({
+                        "pdf_status": "300304"
+                    })
+                    db.session.add(pdf_instance)
+        else:
+            current_app.logger.info(">>>>>>>>>>>>>get used pdf number:0")
+
+    def api_upload_jpg_json(self):
+        """
+        api
+        更新api的json
+        """
+        data = json.loads(request.data)
+
+        json_dict = json.dumps(data)
+        jpg_dict = {
+            "updatetime": datetime.now(),
+            "jpg_dict": json_dict,
+            "jpg_status": "300402"
+        }
+        args = request.args.to_dict()
+        page_path = args.get("page_path")
+        jpg = j_answer_jpg.query.filter(j_answer_jpg.page_path == page_path).first_("不存在该图片")
+        with db.auto_commit():
+            jpg_instance = jpg.update(jpg_dict)
+            db.session.add(jpg_instance)
+        return {
+            "success": True,
+            "message": "更新成功",
+            "status": 200
+        }
 
     def upload_jpg_json(self):
         """
@@ -364,6 +461,7 @@ class COcr():
         如果存在，更新内容存入数据库
         """
         jpg_list = j_answer_jpg.query.filter(j_answer_jpg.isdelete == 0, j_answer_jpg.jpg_status == "300401").all()
+        # TODO 300403改为300401
         if jpg_list:
             for jpg in jpg_list:
                 log_path = jpg.jpg_log_path
@@ -375,7 +473,7 @@ class COcr():
                     last_time = jpg.createtime
                     now_time = datetime.now()
                     timedelta_second = (now_time - last_time).seconds
-                    if timedelta_second >= 30:
+                    if timedelta_second >= 30 * 60:
                         with db.auto_commit():
                             jpg_instance = jpg.update({
                                 "updatetime": datetime.now(),
