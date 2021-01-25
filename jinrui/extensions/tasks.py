@@ -5,6 +5,9 @@ from flask import current_app
 # from jinrui.config.enums import ActivityStatus, UserActivityStatus, OrderMainStatus, CourseStatus, CouponStatus, \
 #     CouponUserStatus, ProductType, ProductStatus
 from jinrui.extensions.register_ext import celery, db
+import requests
+import os
+from datetime import datetime
 
 
 # def add_async_task(func, start_time, func_args, conn_id=None, queue='high_priority'):
@@ -41,8 +44,9 @@ def use_ocr():
     except:
         current_app.logger.info(">>>>>>>>>>>ocr获取路径失败")
 
-#@celery.task(name="use_detect")
-#def use_detect():
+
+# @celery.task(name="use_detect")
+# def use_detect():
 #    try:
 #        from jinrui.control.COcr import COcr
 #        cocr = COcr().use_detect()
@@ -57,6 +61,7 @@ def ocr_fix():
     except:
         current_app.logger.info(">>>>>>>>>>>>>>解析pdf失败")
 
+
 @celery.task(name='upload_jpg')
 def upload_jpg():
     try:
@@ -64,6 +69,7 @@ def upload_jpg():
         cocr = COcr().upload_jpg_json()
     except:
         current_app.logger.info(">>>>>>>>>>>>>读写json失败")
+
 
 @celery.task(name='mock_booklet')
 def mock_booklet():
@@ -73,6 +79,7 @@ def mock_booklet():
     except:
         current_app.logger.info(">>>>>>>>>>>>>生成答卷失败")
 
+
 @celery.task(name="deal_zip")
 def deal_zip():
     try:
@@ -80,6 +87,7 @@ def deal_zip():
         canswer = CAnswer().deal_zip()
     except:
         current_app.logger.info(">>>>>>>>>>>>处理zip失败")
+
 
 @celery.task(name="download_pdf")
 def download_pdf():
@@ -90,42 +98,42 @@ def download_pdf():
         current_app.logger.info(">>>>>>>>>>>下载pdf失败")
 
 
+def get_path(fold):
+    """获取服务器上文件路径"""
+    time_now = datetime.now()
+    year = str(time_now.year)
+    month = str(time_now.month)
+    day = str(time_now.day)
+    filepath = os.path.join(current_app.config['BASEDIR'], 'img', fold, year, month, day)
+    # file_db_path = os.path.join('/img', fold, year, month, day)
+    if not os.path.isdir(filepath):
+        os.makedirs(filepath)
+    return filepath
+
+
+def get_fetch(path, cp):
+    # if qiniu:
+    #     content = requests.get(MEDIA_HOST + path)
+    # else:
+    content = requests.get(path)
+    shuffix = os.path.splitext(path)[-1]
+    filename = cp.random_name(shuffix)
+    filepath = get_path('doc')
+    # filedbname = os.path.join(filedbpath, filename)
+    filename = os.path.join(filepath, filename)
+    with open(filename, 'wb') as head:
+        head.write(content.content)
+    return filename
+
+
 @celery.task(name='auto_setpic')
 def auto_setpic():
     from jinrui.models import j_paper, j_question
-    import requests
-    import os
-    from datetime import datetime
+
     from jinrui.control.Cautopic import CAutopic
     cp = CAutopic()
 
-    def _get_path(fold):
-        """获取服务器上文件路径"""
-        time_now = datetime.now()
-        year = str(time_now.year)
-        month = str(time_now.month)
-        day = str(time_now.day)
-        filepath = os.path.join(current_app.config['BASEDIR'], 'img', fold, year, month, day)
-        # file_db_path = os.path.join('/img', fold, year, month, day)
-        if not os.path.isdir(filepath):
-            os.makedirs(filepath)
-        return filepath
-
-    def _get_fetch(path):
-        # if qiniu:
-        #     content = requests.get(MEDIA_HOST + path)
-        # else:
-        content = requests.get(path)
-        shuffix = os.path.splitext(path)[-1]
-        filename = cp.random_name(shuffix)
-        filepath = _get_path('doc')
-        # filedbname = os.path.join(filedbpath, filename)
-        filename = os.path.join(filepath, filename)
-        with open(filename, 'wb') as head:
-            head.write(content.content)
-        return filename
-
-    jplist = j_paper.query.filter(j_paper.encode_tag == '0').all()
+    jplist = j_paper.query.filter(j_paper.encode_tag == '5').all()
     current_app.logger.info('get jplist {}'.format(len(jplist)))
     try:
         with db.auto_commit():
@@ -140,7 +148,7 @@ def auto_setpic():
                     current_app.logger.info('jp doc {}'.format(jp.doc_url))
 
                     try:
-                        doc_path = _get_fetch(jp.doc_url)
+                        doc_path = get_fetch(jp.doc_url, cp)
                         paper_dict, img_paper_dict = cp.analysis_word(doc_path)
                         # current_app.logger.info(paper_dict)
                         # current_app.logger.info('get paperdict ')
@@ -152,7 +160,7 @@ def auto_setpic():
                     current_app.logger.info('jp doc over')
                 if jp.answer_doc_url:
                     try:
-                        answer_path = _get_fetch(jp.answer_doc_url)
+                        answer_path = get_fetch(jp.answer_doc_url, cp)
                         answer_dict, img_answer_dict = cp.analysis_word(answer_path)
                         # current_app.logger.info(answer_dict)
                         # current_app.logger.info('get answer_dict')
@@ -192,10 +200,56 @@ def test_print():
     current_app.logger.info('TEST PRINT: {}'.format(datetime.now()))
 
 
+@celery.task(name='analysis_excel')
+def analysis_excel():
+    from jinrui.models import j_paper
+
+    from jinrui.control.Cautopic import CAutopic
+    from jinrui.control.CAnalysis import CAnalysis
+    cp = CAutopic()
+
+    ca = CAnalysis()
+
+    jplist = j_paper.query.filter(j_paper.encode_tag == '0').all()
+    current_app.logger.info('get jplist {}'.format(len(jplist)))
+    try:
+        with db.auto_commit():
+            update_list = []
+            for jp in jplist:
+
+                encode_tag = '5'
+                grade = 0
+                if jp.knowledge_url:
+                    current_app.logger.info('jp doc {}'.format(jp.knowledge_url))
+                    try:
+                        excel_path = get_fetch(jp.knowledge_url, cp)
+                        quest_model_list, grade = ca.analysis_execel(jp, excel_path)
+                        if not quest_model_list:
+                            encode_tag = '6'
+                        db.session.add_all(quest_model_list)
+
+                    except Exception as e:
+                        current_app.logger.error('解析 excel 失败 pageid = {} {}'.format(jp.id, e))
+                        encode_tag = '6'
+                    current_app.logger.info('jp excel over')
+                else:
+                    encode_tag = '6'
+                jp.encode_tag = encode_tag
+                jp.grade = grade
+                update_list.append(jp)
+            try:
+                db.session.add_all(update_list)
+            except Exception as e:
+                current_app.logger.error('数据更新失败 {}'.format(e))
+                raise e
+    except Exception as e:
+        current_app.logger.info('解析试卷失败 {}'.format(e))
+
+
 if __name__ == '__main__':
     from jinrui import create_app
 
     app = create_app()
     with app.app_context():
         # auto_setpic()
-        auto_setpic()
+        analysis_excel()
