@@ -133,7 +133,7 @@ def auto_setpic():
     from jinrui.control.Cautopic import CAutopic
     cp = CAutopic()
 
-    jplist = j_paper.query.filter(j_paper.encode_tag == '0').all()
+    jplist = j_paper.query.filter(j_paper.encode_tag == '5').all()
     current_app.logger.info('get jplist {}'.format(len(jplist)))
     try:
         with db.auto_commit():
@@ -200,10 +200,56 @@ def test_print():
     current_app.logger.info('TEST PRINT: {}'.format(datetime.now()))
 
 
+@celery.task(name='analysis_excel')
+def analysis_excel():
+    from jinrui.models import j_paper
+
+    from jinrui.control.Cautopic import CAutopic
+    from jinrui.control.CAnalysis import CAnalysis
+    cp = CAutopic()
+
+    ca = CAnalysis()
+
+    jplist = j_paper.query.filter(j_paper.encode_tag == '0').all()
+    current_app.logger.info('get jplist {}'.format(len(jplist)))
+    try:
+        with db.auto_commit():
+            update_list = []
+            for jp in jplist:
+
+                encode_tag = '5'
+                grade = 0
+                if jp.knowledge_url:
+                    current_app.logger.info('jp doc {}'.format(jp.knowledge_url))
+                    try:
+                        excel_path = get_fetch(jp.knowledge_url, cp)
+                        quest_model_list, grade = ca.analysis_execel(jp, excel_path)
+                        if not quest_model_list:
+                            encode_tag = '6'
+                        db.session.add_all(quest_model_list)
+
+                    except Exception as e:
+                        current_app.logger.error('解析 excel 失败 pageid = {} {}'.format(jp.id, e))
+                        encode_tag = '6'
+                    current_app.logger.info('jp excel over')
+                else:
+                    encode_tag = '6'
+                jp.encode_tag = encode_tag
+                jp.grade = grade
+                update_list.append(jp)
+            try:
+                db.session.add_all(update_list)
+            except Exception as e:
+                current_app.logger.error('数据更新失败 {}'.format(e))
+                raise e
+    except Exception as e:
+        current_app.logger.info('解析试卷失败 {}'.format(e))
+
+
 if __name__ == '__main__':
     from jinrui import create_app
 
     app = create_app()
     with app.app_context():
         # auto_setpic()
-        auto_setpic()
+        analysis_excel()
